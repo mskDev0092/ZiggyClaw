@@ -30,7 +30,6 @@ fn containsDangerousPatterns(params: []const u8) bool {
 }
 
 fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResult {
-    _ = ctx;
 
     // Safety check 1: Only allow whitelisted commands
     if (!isCommandAllowed(params)) {
@@ -42,9 +41,10 @@ fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResul
         return .{ .success = false, .data = "", .error_msg = "Command contains dangerous characters" };
     }
 
-    const output = security.sandbox.runSandboxed(params) catch |err|
+    const output = security.sandbox.runSandboxed(ctx.allocator, params) catch |err|
         return .{ .success = false, .data = "", .error_msg = @errorName(err) };
 
+    // Note: caller is responsible for freeing the output
     return .{ .success = true, .data = output };
 }
 

@@ -16,6 +16,11 @@ pub const ToolContext = struct {
     session_id: []const u8,
 };
 
+pub const ToolDefinition = struct {
+    name: []const u8,
+    description: []const u8,
+};
+
 pub const AgentConfig = struct {
     model: []const u8 = "gpt-4o",
 };
