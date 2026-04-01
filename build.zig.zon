@@ -1,0 +1,8 @@
+.{
+    .fingerprint = 0x536e69ea45c0882,
+    .name = .ziggyclaws,
+    .version = "1.0.0",
+    .minimum_zig_version = "0.14.0",
+    .dependencies = .{},
+    .paths = .{ "src", "build.zig", "build.zig.zon" },
+}
