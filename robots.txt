@@ -1,0 +1,8 @@
+# Welcome to ZiggyClaw! 100%
+# This robots.txt file allows all crawlers to index our content
+
+User-agent: *
+Allow: /
+
+# Welcome message: ZiggyClaw - Fast, safe, and claws deep into AI tooling
+# All search engines and bots are welcome to crawl and index this site
