@@ -23,12 +23,20 @@ pub const ToolRegistry = struct {
         try self.tools.put(tool.name, tool);
     }
 
-    pub fn list(self: *const ToolRegistry) void {
-        std.debug.print("Available tools:\n", .{});
+    pub fn list(self: *const ToolRegistry) []const Tool {
+        var count: usize = 0;
         var it = self.tools.iterator();
-        while (it.next()) |entry| {
-            std.debug.print("  • {s} - {s}\n", .{ entry.key_ptr.*, entry.value_ptr.description });
+        while (it.next()) |_| {
+            count += 1;
         }
+        var result = self.allocator.alloc(Tool, count) catch return &[_]Tool{};
+        var i: usize = 0;
+        var it2 = self.tools.iterator();
+        while (it2.next()) |entry| {
+            result[i] = entry.value_ptr.*;
+            i += 1;
+        }
+        return result;
     }
 
     pub fn get(self: *const ToolRegistry, name: []const u8) ?Tool {

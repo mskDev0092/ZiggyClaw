@@ -83,6 +83,10 @@ pub const Agent = struct {
 
             // Call LLM with current session history
             const llm_response = try llm.callLLM(sess.messages, tool_defs);
+            defer {
+                self.allocator.free(llm_response.content);
+                self.allocator.free(llm_response.stop_reason);
+            }
 
             // Add LLM response to session
             if (llm_response.content.len > 0) {
@@ -93,7 +97,7 @@ pub const Agent = struct {
             if (llm_response.tool_calls.items.len == 0) {
                 llm_response.tool_calls.deinit();
                 if (llm_response.content.len > 0) {
-                    return llm_response.content;
+                    return try self.allocator.dupe(u8, llm_response.content);
                 } else {
                     return "Agent completed reasoning";
                 }
@@ -119,7 +123,7 @@ pub const Agent = struct {
             // If stop_reason is "end_turn", we're done
             if (std.mem.eql(u8, llm_response.stop_reason, "end_turn")) {
                 if (llm_response.content.len > 0) {
-                    return llm_response.content;
+                    return try self.allocator.dupe(u8, llm_response.content);
                 } else {
                     return "Agent completed with tool calls";
                 }

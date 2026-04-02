@@ -92,7 +92,11 @@ fn listTools(allocator: std.mem.Allocator) !void {
 
     const stdout = std.io.getStdOut().writer();
     try stdout.print("Available tools:\n", .{});
-    registry.list();
+    const tool_list = registry.list();
+    defer allocator.free(tool_list);
+    for (tool_list) |tool| {
+        try stdout.print("  • {s} - {s}\n", .{ tool.name, tool.description });
+    }
 }
 
 fn runDoctor() !void {

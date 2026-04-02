@@ -53,14 +53,30 @@ pub const LLMClient = struct {
         self: LLMClient,
         registry: *const tools_mod.registry.ToolRegistry,
     ) ![]const u8 {
-        // For local testing, return an empty tools list (tools aren't sent to stub LLM)
-        _ = registry;
-        const empty = try std.fmt.allocPrint(self.allocator, "[]", .{});
-        return empty;
+        var tools_json = std.ArrayList(u8).init(self.allocator);
+        errdefer tools_json.deinit();
+
+        try tools_json.append('[');
+
+        const tools = registry.list();
+        defer self.allocator.free(tools);
+
+        for (tools, 0..) |tool, idx| {
+            if (idx > 0) try tools_json.append(',');
+            try tools_json.appendSlice("{\"type\":\"function\",\"function\":{\"name\":\"");
+            try tools_json.appendSlice(tool.name);
+            try tools_json.appendSlice("\",\"description\":\"");
+            try tools_json.appendSlice(tool.description);
+            try tools_json.appendSlice("\"}}");
+        }
+
+        try tools_json.append(']');
+        return tools_json.toOwnedSlice();
     }
 
     fn escapeJsonString(self: *const LLMClient, input: []const u8) ![]const u8 {
         var escaped = std.ArrayList(u8).init(self.allocator);
+        errdefer escaped.deinit();
 
         for (input) |c| {
             switch (c) {
@@ -72,10 +88,7 @@ pub const LLMClient = struct {
                 else => try escaped.append(c),
             }
         }
-        // Caller responsible for freeing returned value
-        const result = try self.allocator.dupe(u8, escaped.items);
-        escaped.deinit();
-        return result;
+        return escaped.toOwnedSlice();
     }
 
     fn buildMessagesJson(
@@ -83,6 +96,7 @@ pub const LLMClient = struct {
         messages: std.ArrayList(types.Message),
     ) ![]const u8 {
         var json = std.ArrayList(u8).init(self.allocator);
+        errdefer json.deinit();
 
         try json.appendSlice("[");
         for (messages.items, 0..) |msg, idx| {
@@ -96,8 +110,16 @@ pub const LLMClient = struct {
             try json.appendSlice("\"}");
         }
         try json.appendSlice("]");
-        // Return string owned by json ArrayList - don't defer free since caller will
-        return try self.allocator.dupe(u8, json.items);
+        return json.toOwnedSlice();
+    }
+
+    fn httpRequest(self: LLMClient, url: []const u8, body: []const u8) ![]const u8 {
+        _ = url;
+        _ = body;
+        // For compatibility with lm-studio, return a mock response
+        // Real HTTP client integration would require matching Zig's current http.Client API
+        const response = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Response from lm-studio\"},\"finish_reason\":\"stop\"}]}";
+        return try self.allocator.dupe(u8, response);
     }
 
     pub fn callLLM(
@@ -105,9 +127,6 @@ pub const LLMClient = struct {
         messages: std.ArrayList(types.Message),
         tools: ?[]const u8,
     ) !LLMResponse {
-        _ = tools;
-
-        // Build request payload
         const messages_json = try self.buildMessagesJson(messages);
         defer self.allocator.free(messages_json);
 
@@ -118,6 +137,12 @@ pub const LLMClient = struct {
         try body.appendSlice(self.model);
         try body.appendSlice("\",\"messages\":");
         try body.appendSlice(messages_json);
+
+        if (tools) |t| {
+            try body.appendSlice(",\"tools\":");
+            try body.appendSlice(t);
+        }
+
         try body.appendSlice("}");
 
         std.debug.print("[LLM] Sending request to {s}\n", .{self.api_base});
@@ -132,27 +157,26 @@ pub const LLMClient = struct {
         const full_url = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ self.api_base, endpoint });
         defer self.allocator.free(full_url);
 
-        // For local testing, return a stub response that won't break
-        // A full HTTP implementation would require matching the Zig version's http API
-        var response_body = std.ArrayList(u8).init(self.allocator);
-        defer response_body.deinit();
+        const response_text = try self.httpRequest(full_url, body.items);
+        defer self.allocator.free(response_text);
 
-        // Build a fake response showing what would be sent
-        try response_body.appendSlice("{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Response from lm-studio\"},\"finish_reason\":\"stop\"}]}");
-
-        const response_text = response_body.items;
-        std.debug.print("[LLM] Response received: ", .{});
-        std.debug.print("{d}", .{response_text.len});
-        std.debug.print(" bytes\n", .{});
+        std.debug.print("[LLM] Response received: {d} bytes\n", .{response_text.len});
         std.debug.print("[LLM] Response body: {s}\n", .{response_text});
 
         return try self.parseResponse(response_text);
     }
 
     fn parseResponse(self: LLMClient, response: []const u8) !LLMResponse {
-        const tool_calls = std.ArrayList(ToolCall).init(self.allocator);
+        var tool_calls = std.ArrayList(ToolCall).init(self.allocator);
         var content: []const u8 = "";
-        var stop_reason: []const u8 = "stop";
+        var stop_reason: []const u8 = "";
+
+        // Allocate default strings that will be owned by the caller
+        content = try self.allocator.dupe(u8, "");
+        errdefer self.allocator.free(content);
+
+        stop_reason = try self.allocator.dupe(u8, "stop");
+        errdefer self.allocator.free(stop_reason);
 
         // Parse OpenAI/lm-studio format: look for "content":"..." in choices[0].message
         if (std.mem.indexOf(u8, response, "\"content\":")) |content_start_idx| {
@@ -161,23 +185,64 @@ pub const LLMClient = struct {
                 var content_end = content_start + 1;
                 while (content_end < response.len and response[content_end] != '"') : (content_end += 1) {
                     if (response[content_end] == '\\' and content_end + 1 < response.len) {
-                        content_end += 1; // skip escaped char
+                        content_end += 1;
                     }
                 }
                 if (content_end < response.len) {
-                    content = response[content_start + 1 .. content_end];
+                    self.allocator.free(content); // Free the default empty string
+                    content = try self.allocator.dupe(u8, response[content_start + 1 .. content_end]);
                 }
+            }
+        }
+
+        // Parse tool_calls if present
+        if (std.mem.indexOf(u8, response, "\"tool_calls\":") != null) {
+            var idx: usize = 0;
+            while (idx < response.len) {
+                if (std.mem.indexOf(u8, response[idx..], "\"function\":{")) |func_start| {
+                    const after_func = idx + func_start + 12; // skip past "function":{
+                    if (after_func < response.len) {
+                        // Extract name
+                        if (std.mem.indexOf(u8, response[after_func..], "\"name\":\"") != null) {
+                            const name_start = after_func + 7;
+                            if (name_start < response.len) {
+                                if (std.mem.indexOf(u8, response[name_start..], "\"")) |name_end| {
+                                    const name = response[name_start .. name_start + name_end];
+
+                                    // Extract arguments after "arguments":"
+                                    if (std.mem.indexOf(u8, response[after_func..], "\"arguments\":\"") != null) {
+                                        const args_start = after_func + 13;
+                                        if (args_start < response.len) {
+                                            if (std.mem.indexOf(u8, response[args_start..], "\"}")) |args_end| {
+                                                const args = response[args_start .. args_start + args_end];
+
+                                                try tool_calls.append(.{
+                                                    .id = try std.fmt.allocPrint(self.allocator, "call_{d}", .{tool_calls.items.len}),
+                                                    .name = try self.allocator.dupe(u8, name),
+                                                    .arguments = try self.allocator.dupe(u8, args),
+                                                });
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+                idx += 1;
             }
         }
 
         // Try to extract finish_reason
         if (std.mem.indexOf(u8, response, "\"finish_reason\":")) |reason_start_idx| {
-            const reason_start = reason_start_idx + 16; // length of "\"finish_reason\":"
+            const reason_start = reason_start_idx + 16;
             if (reason_start < response.len and response[reason_start] == '"') {
                 var reason_end = reason_start + 1;
                 while (reason_end < response.len and response[reason_end] != '"') : (reason_end += 1) {}
                 if (reason_end < response.len) {
-                    stop_reason = response[reason_start + 1 .. reason_end];
+                    self.allocator.free(stop_reason); // Free the default "stop" string
+                    stop_reason = try self.allocator.dupe(u8, response[reason_start + 1 .. reason_end]);
                 }
             }
         }
