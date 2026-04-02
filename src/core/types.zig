@@ -9,6 +9,7 @@ pub const ToolResult = struct {
     success: bool,
     data: []const u8,
     error_msg: ?[]const u8 = null,
+    owned: bool = false,
 };
 
 pub const ToolContext = struct {

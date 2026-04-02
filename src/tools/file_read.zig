@@ -25,7 +25,7 @@ fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResul
     const content = file.readToEndAlloc(ctx.allocator, 65536) catch |err|
         return .{ .success = false, .data = "", .error_msg = @errorName(err) };
 
-    return .{ .success = true, .data = content };
+    return .{ .success = true, .data = content, .owned = true };
 }
 
 pub fn getTool() registry.ToolRegistry.Tool {

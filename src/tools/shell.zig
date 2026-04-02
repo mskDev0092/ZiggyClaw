@@ -45,7 +45,7 @@ fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResul
         return .{ .success = false, .data = "", .error_msg = @errorName(err) };
 
     // Note: caller is responsible for freeing the output
-    return .{ .success = true, .data = output };
+    return .{ .success = true, .data = output, .owned = true };
 }
 
 pub fn getTool() registry.ToolRegistry.Tool {

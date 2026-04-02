@@ -114,12 +114,35 @@ pub const LLMClient = struct {
     }
 
     fn httpRequest(self: LLMClient, url: []const u8, body: []const u8) ![]const u8 {
-        _ = url;
-        _ = body;
-        // For compatibility with lm-studio, return a mock response
-        // Real HTTP client integration would require matching Zig's current http.Client API
-        const response = "{\"choices\":[{\"message\":{\"role\":\"assistant\",\"content\":\"Response from lm-studio\"},\"finish_reason\":\"stop\"}]}";
-        return try self.allocator.dupe(u8, response);
+        var client: std.http.Client = .{ .allocator = self.allocator };
+        defer client.deinit();
+
+        var header_buf: [4096]u8 = undefined;
+        var extra_headers = [_]std.http.Header{
+            .{ .name = "Content-Type", .value = "application/json" },
+        };
+
+        var auth_header_buf: [256]u8 = undefined;
+        var auth_header: ?std.http.Header = null;
+        if (self.api_key.len > 0) {
+            const auth = try std.fmt.bufPrint(&auth_header_buf, "Bearer {s}", .{self.api_key});
+            auth_header = .{ .name = "Authorization", .value = auth };
+        }
+
+        var req = try client.open(.POST, try std.Uri.parse(url), .{
+            .server_header_buffer = &header_buf,
+            .extra_headers = if (auth_header) |h| &[_]std.http.Header{ extra_headers[0], h } else &extra_headers,
+        });
+        defer req.deinit();
+
+        req.transfer_encoding = .{ .content_length = body.len };
+        try req.send();
+        try req.writeAll(body);
+        try req.finish();
+        try req.wait();
+
+        const response_body = try req.reader().readAllAlloc(self.allocator, 1024 * 1024);
+        return response_body;
     }
 
     pub fn callLLM(

@@ -22,7 +22,7 @@ pub fn run(allocator: std.mem.Allocator) !void {
 
     if (std.mem.eql(u8, subcommand, "gateway") or std.mem.eql(u8, subcommand, "start")) {
         // Default gateway port for local testing
-        var port: u16 = 1234;
+        var port: u16 = 18789;
 
         // Allow overriding via environment variable GATEWAY_PORT
         var env_map = try std.process.getEnvMap(allocator);
@@ -141,6 +141,6 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
 
     // Run agent
     const response = try agent.think("cli-session", message);
+    defer allocator.free(response);
     try std.io.getStdOut().writer().print("{s}\n", .{response});
-    // Note: response may be a string literal or allocated data, so we don't free it
 }
