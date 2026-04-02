@@ -85,9 +85,12 @@ pub fn start(port: u16) !void {
         const connection = try listener.accept();
         defer connection.stream.close();
 
-        // Read request
+        // Read request - use read() instead of readAll() since HTTP clients don't send EOF
         var buffer: [4096]u8 = undefined;
-        const bytes_read = try connection.stream.readAll(&buffer);
+        const bytes_read = connection.stream.read(&buffer) catch |err| {
+            if (err == error.WouldBlock) continue;
+            return err;
+        };
 
         if (bytes_read == 0) continue;
 

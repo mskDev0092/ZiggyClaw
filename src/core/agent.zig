@@ -38,18 +38,25 @@ pub const Agent = struct {
         var iteration: usize = 0;
 
         // For now, fallback to simple response if no LLM API is configured
-        // In phase 2.5 we'll add proper LLM integration with environment variables
-        // check for OpenAI API key
+        // Support reading LLM base URL from environment so local LLMs can be used
         var use_llm = false;
         var api_key: []const u8 = "";
+        var api_base: []const u8 = "https://api.openai.com/v1";
 
-        // Try to get API key from environment (will implement full LLM in next step)
+        // Read environment variables for API key / base
         var env_map = try std.process.getEnvMap(self.allocator);
         defer env_map.deinit();
 
+        // OPENAI_API_BASE enables LLM mode (will be used for local lm-studio/ollama)
+        if (env_map.get("OPENAI_API_BASE")) |b| {
+            api_base = b;
+            use_llm = true;
+            std.debug.print("[Agent] Using custom LLM base: {s}\n", .{api_base});
+        }
+
+        // OPENAI_API_KEY is optional (not needed for local lm-studio)
         if (env_map.get("OPENAI_API_KEY")) |key| {
             api_key = key;
-            use_llm = true;
         }
 
         // ReAct loop
@@ -67,7 +74,7 @@ pub const Agent = struct {
                 self.allocator,
                 api_key,
                 self.config.model,
-                "https://api.openai.com/v1",
+                api_base,
             );
 
             // Get tool definitions and call LLM
