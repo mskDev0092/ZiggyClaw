@@ -2,6 +2,8 @@
 
 A Zig-native OpenClaw clone - fast, safe, and claws deep into AI tooling.
 
+![](https://github.com/mskDev0092/ZiggyClaw/blob/main/assets/2vQny.jpg)
+
 ## Quick Start
 
 ```bash
@@ -114,3 +116,7 @@ zig build run    # Runs default command (help)
 ## Requirements
 
 - Zig 0.14.0+
+
+## Contributions
+
+- Every contribution is welcomed in only in pure zig 
