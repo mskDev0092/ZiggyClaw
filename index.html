@@ -1,0 +1,1123 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ZiggyClaw - Zig-native AI Tooling (Early Development)</title>
+        <meta
+            name="description"
+            content="ZiggyClaw - An early development Zig-native OpenClaw clone. Fast, safe, and claws deep into AI tooling. Build from source with Zig 0.14+."
+        />
+        <meta name="robots" content="index, follow" />
+        <meta name="author" content="mskDev0092" />
+        <meta name="keywords" content="Zig, AI, agent, CLI, OpenClaw, LLM, LM Studio, tooling" />
+        <link rel="canonical" href="https://github.com/mskDev0092/ZiggyClaw" />
+
+        <!-- Open Graph -->
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="ZiggyClaw - Zig-native AI Tooling" />
+        <meta property="og:description" content="Early development Zig-native OpenClaw clone. Fast, safe, and claws deep into AI tooling." />
+        <meta property="og:url" content="https://github.com/mskDev0092/ZiggyClaw" />
+        <meta property="og:site_name" content="ZiggyClaw" />
+
+        <!-- AI / Machine-readable metadata -->
+        <meta name="application-name" content="ZiggyClaw" />
+        <meta name="generator" content="Zig 0.14.1" />
+        <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "SoftwareApplication",
+            "name": "ZiggyClaw",
+            "description": "An early development Zig-native OpenClaw clone. Fast, safe, and claws deep into AI tooling.",
+            "url": "https://github.com/mskDev0092/ZiggyClaw",
+            "applicationCategory": "DeveloperApplication",
+            "operatingSystem": "Linux, macOS, Windows",
+            "programmingLanguage": "Zig",
+            "softwareVersion": "0.1.0",
+            "developmentStatus": "early-development",
+            "author": {
+                "@type": "Person",
+                "name": "mskDev0092",
+                "url": "https://github.com/mskDev0092"
+            },
+            "codeRepository": "https://github.com/mskDev0092/ZiggyClaw",
+            "license": "https://spdx.org/licenses/MIT",
+            "runtimePlatform": "Zig 0.14.0+"
+        }
+        </script>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;700&display=swap"
+            rel="stylesheet"
+        />
+        <script>
+            document.documentElement.classList.add("js");
+        </script>
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+            :root {
+                --bg: #08090c;
+                --fg: #e8e8ec;
+                --muted: #7a7a88;
+                --accent: #00e89a;
+                --accent-dim: #00b876;
+                --card: #0e1015;
+                --card-hover: #14161e;
+                --border: #1c1e26;
+                --border-hover: #2a2c38;
+                --code-bg: #0a0b10;
+                --warning: #e8a830;
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .js .reveal {
+                    opacity: 1 !important;
+                    transform: none !important;
+                    transition: none !important;
+                }
+            }
+            html {
+                scroll-behavior: smooth;
+            }
+            body {
+                font-family: "Space Grotesk", sans-serif;
+                background: var(--bg);
+                color: var(--fg);
+                line-height: 1.65;
+                min-height: 100vh;
+                overflow-x: hidden;
+            }
+            .mono {
+                font-family: "JetBrains Mono", monospace;
+            }
+
+            /* Background layers */
+            .bg-layer {
+                position: fixed;
+                inset: 0;
+                pointer-events: none;
+                z-index: -1;
+            }
+            .bg-grid {
+                background-image:
+                    linear-gradient(rgba(28, 30, 38, 0.5) 1px, transparent 1px),
+                    linear-gradient(
+                        90deg,
+                        rgba(28, 30, 38, 0.5) 1px,
+                        transparent 1px
+                    );
+                background-size: 50px 50px;
+                mask-image: radial-gradient(
+                    ellipse 80% 50% at 50% 0%,
+                    rgba(0, 0, 0, 0.6) 0%,
+                    transparent 70%
+                );
+                -webkit-mask-image: radial-gradient(
+                    ellipse 80% 50% at 50% 0%,
+                    rgba(0, 0, 0, 0.6) 0%,
+                    transparent 70%
+                );
+            }
+            .bg-glow {
+                background: radial-gradient(
+                    ellipse 60% 50% at 60% 0%,
+                    rgba(0, 232, 154, 0.07) 0%,
+                    transparent 60%
+                );
+            }
+
+            /* Container */
+            .container {
+                max-width: 980px;
+                margin: 0 auto;
+                padding: 0 24px;
+                position: relative;
+            }
+
+            /* Header */
+            header {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                z-index: 100;
+                padding: 16px 0;
+                background: rgba(8, 9, 12, 0.9);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border-bottom: 1px solid var(--border);
+            }
+            header .container {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            .logo {
+                display: flex;
+                align-items: center;
+                gap: 12px;
+                font-weight: 700;
+                font-size: 1.15rem;
+                text-decoration: none;
+                color: var(--fg);
+            }
+            .logo-icon {
+                width: 36px;
+                height: 36px;
+                background: linear-gradient(
+                    135deg,
+                    var(--accent) 0%,
+                    var(--accent-dim) 100%
+                );
+                border-radius: 8px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: var(--bg);
+                font-weight: 700;
+                font-size: 0.9rem;
+                font-family: "JetBrains Mono", monospace;
+            }
+            .nav-links {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
+            .nav-link {
+                padding: 8px 14px;
+                color: var(--muted);
+                text-decoration: none;
+                font-size: 0.9rem;
+                border-radius: 6px;
+                transition:
+                    color 0.2s,
+                    background 0.2s;
+            }
+            .nav-link:hover,
+            .nav-link:focus {
+                color: var(--fg);
+                background: var(--card);
+                outline: none;
+            }
+
+            /* Buttons */
+            .btn {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 0.9rem;
+                text-decoration: none;
+                cursor: pointer;
+                border: none;
+                transition: all 0.2s;
+                font-family: inherit;
+            }
+            .btn-primary {
+                background: var(--accent);
+                color: var(--bg);
+            }
+            .btn-primary:hover:not(:disabled) {
+                background: var(--accent-dim);
+                transform: translateY(-1px);
+            }
+            .btn-secondary {
+                background: var(--card);
+                color: var(--fg);
+                border: 1px solid var(--border);
+            }
+            .btn-secondary:hover:not(:disabled) {
+                background: var(--card-hover);
+                border-color: var(--border-hover);
+            }
+            .btn:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+                transform: none;
+            }
+
+            /* Hero */
+            .hero {
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                padding: 130px 0 80px;
+            }
+            .status-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 6px 14px;
+                background: rgba(232, 168, 48, 0.1);
+                border: 1px solid rgba(232, 168, 48, 0.25);
+                border-radius: 100px;
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: var(--warning);
+                margin-bottom: 24px;
+                width: fit-content;
+            }
+            .status-badge::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                background: var(--warning);
+                border-radius: 50%;
+                animation: statusPulse 2s ease-in-out infinite;
+            }
+            @keyframes statusPulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.4;
+                }
+            }
+            .hero h1 {
+                font-size: clamp(2.5rem, 8vw, 4rem);
+                font-weight: 700;
+                line-height: 1.1;
+                margin-bottom: 12px;
+                letter-spacing: -0.03em;
+                color: var(--fg);
+            }
+            .hero-sub {
+                color: var(--accent);
+                font-weight: 600;
+                font-size: 1.1rem;
+                margin-bottom: 20px;
+                font-family: "JetBrains Mono", monospace;
+            }
+            .hero-desc {
+                font-size: 1.15rem;
+                color: var(--muted);
+                max-width: 540px;
+                margin-bottom: 36px;
+                line-height: 1.7;
+            }
+
+            /* Download section */
+            .download-section {
+                margin-bottom: 40px;
+            }
+            .download-label {
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: var(--muted);
+                margin-bottom: 12px;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+            }
+            .download-grid {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+            .download-btn {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                padding: 14px 18px;
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                color: var(--muted);
+                font-size: 0.9rem;
+                font-weight: 500;
+                cursor: not-allowed;
+                opacity: 0.5;
+                transition: opacity 0.2s;
+            }
+            .download-btn svg {
+                width: 20px;
+                height: 20px;
+                flex-shrink: 0;
+            }
+            .download-note {
+                margin-top: 14px;
+                font-size: 0.85rem;
+                color: var(--muted);
+            }
+
+            /* Hero actions */
+            .hero-actions {
+                display: flex;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            /* Terminal preview */
+            .terminal-preview {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                overflow: hidden;
+                margin-top: 60px;
+            }
+            .terminal-header {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                padding: 14px 18px;
+                background: var(--code-bg);
+                border-bottom: 1px solid var(--border);
+            }
+            .terminal-dot {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+            }
+            .terminal-dot:nth-child(1) {
+                background: #ff5f57;
+            }
+            .terminal-dot:nth-child(2) {
+                background: #febc2e;
+            }
+            .terminal-dot:nth-child(3) {
+                background: #28c840;
+            }
+            .terminal-body {
+                padding: 20px 24px;
+                font-family: "JetBrains Mono", monospace;
+                font-size: 0.9rem;
+                line-height: 2;
+                overflow-x: auto;
+            }
+            .terminal-line {
+                display: block;
+            }
+            .terminal-prompt {
+                color: var(--accent);
+                margin-right: 10px;
+            }
+            .terminal-text {
+                color: var(--fg);
+            }
+            .terminal-comment {
+                color: var(--muted);
+            }
+
+            /* Section */
+            section {
+                padding: 80px 0;
+            }
+            .section-tag {
+                color: var(--accent);
+                font-size: 0.8rem;
+                font-weight: 700;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                margin-bottom: 8px;
+            }
+            .section-title {
+                font-size: clamp(1.6rem, 4vw, 2.2rem);
+                font-weight: 700;
+                margin-bottom: 16px;
+                letter-spacing: -0.02em;
+                color: var(--fg);
+            }
+            .section-desc {
+                color: var(--muted);
+                margin-bottom: 40px;
+                max-width: 620px;
+                font-size: 1.05rem;
+            }
+
+            /* Command table */
+            .cmd-table {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                overflow: hidden;
+            }
+            .cmd-table table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .cmd-table th,
+            .cmd-table td {
+                padding: 16px 20px;
+                text-align: left;
+                border-bottom: 1px solid var(--border);
+            }
+            .cmd-table th {
+                font-size: 0.75rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: var(--muted);
+                font-weight: 600;
+                background: var(--code-bg);
+            }
+            .cmd-table tr:last-child td {
+                border-bottom: none;
+            }
+            .cmd-table td:first-child {
+                font-family: "JetBrains Mono", monospace;
+                font-size: 0.88rem;
+                color: var(--accent);
+                white-space: nowrap;
+            }
+            .cmd-table td:last-child {
+                color: var(--muted);
+                font-size: 0.92rem;
+            }
+
+            /* Architecture */
+            .arch-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+                gap: 12px;
+            }
+            .arch-item {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 10px;
+                padding: 18px 20px;
+                transition:
+                    border-color 0.2s,
+                    background 0.2s;
+            }
+            .arch-item:hover {
+                border-color: var(--border-hover);
+                background: var(--card-hover);
+            }
+            .arch-name {
+                font-family: "JetBrains Mono", monospace;
+                font-size: 0.95rem;
+                font-weight: 600;
+                color: var(--accent);
+                margin-bottom: 4px;
+            }
+            .arch-desc {
+                font-size: 0.88rem;
+                color: var(--muted);
+            }
+
+            /* Integration */
+            .integration-card {
+                background: var(--card);
+                border: 1px solid var(--border);
+                border-radius: 12px;
+                padding: 24px;
+                margin-bottom: 20px;
+            }
+            .integration-header {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                margin-bottom: 18px;
+            }
+            .integration-icon {
+                width: 44px;
+                height: 44px;
+                background: linear-gradient(135deg, #14162a 0%, #1a1c32 100%);
+                border-radius: 10px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: 700;
+                font-size: 0.85rem;
+                color: #5a9cff;
+                font-family: "JetBrains Mono", monospace;
+            }
+            .integration-title {
+                font-size: 1.1rem;
+                font-weight: 600;
+                color: var(--fg);
+            }
+            .integration-sub {
+                font-size: 0.9rem;
+                color: var(--muted);
+                margin-top: 2px;
+            }
+
+            /* Code block */
+            .code-block {
+                background: var(--code-bg);
+                border: 1px solid var(--border);
+                border-radius: 8px;
+                padding: 18px 20px;
+                font-family: "JetBrains Mono", monospace;
+                font-size: 0.85rem;
+                line-height: 1.9;
+                overflow-x: auto;
+                margin-top: 16px;
+            }
+            .code-comment {
+                color: var(--muted);
+            }
+            .code-cmd {
+                color: var(--fg);
+            }
+            .code-var {
+                color: var(--accent);
+            }
+
+            /* Footer */
+            footer {
+                padding: 50px 0;
+                border-top: 1px solid var(--border);
+                text-align: center;
+            }
+            .footer-text {
+                font-size: 0.9rem;
+                color: var(--muted);
+            }
+            .footer-text a {
+                color: var(--accent);
+                text-decoration: none;
+                font-weight: 500;
+            }
+            .footer-text a:hover {
+                text-decoration: underline;
+            }
+
+            /* Reveal animation - visible by default */
+            .reveal {
+                opacity: 1;
+                transform: translateY(0);
+                transition:
+                    opacity 0.5s ease,
+                    transform 0.5s ease;
+            }
+            .js .reveal {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            .js .reveal.visible {
+                opacity: 1;
+                transform: translateY(0);
+            }
+
+            /* Responsive */
+            @media (max-width: 768px) {
+                .nav-links {
+                    display: none;
+                }
+                .hero-actions {
+                    flex-direction: column;
+                }
+                .hero-actions .btn {
+                    width: 100%;
+                }
+                .download-grid {
+                    flex-direction: column;
+                }
+                .download-btn {
+                    justify-content: center;
+                }
+                .cmd-table {
+                    overflow-x: auto;
+                }
+                .cmd-table table {
+                    min-width: 500px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="bg-layer bg-grid"></div>
+        <div class="bg-layer bg-glow"></div>
+
+        <header>
+            <div class="container">
+                <a href="#" class="logo">
+                    <div class="logo-icon">ZC</div>
+                    ZiggyClaw
+                </a>
+                <nav class="nav-links">
+                    <a href="#commands" class="nav-link">Commands</a>
+                    <a href="#integration" class="nav-link">Integration</a>
+                    <a href="#architecture" class="nav-link">Architecture</a>
+                    <a
+                        href="https://github.com/mskDev0092/ZiggyClaw"
+                        target="_blank"
+                        rel="noopener"
+                        class="nav-link"
+                    >
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            style="margin-right: 4px; vertical-align: -3px"
+                        >
+                            <path
+                                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+                            />
+                        </svg>
+                        GitHub
+                    </a>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            <section class="hero">
+                <div class="container">
+                    <div class="status-badge">Early Development</div>
+                    <h1>Zig-native AI Tooling</h1>
+                    <p class="hero-sub">
+                        ZiggyClaw - A Zig-native OpenClaw clone
+                    </p>
+                    <p class="hero-desc">
+                        Early development project. Fast, safe, and claws deep
+                        into AI tooling. Built with Zig 0.14.0+ for maximum
+                        performance and reliability. Core CLI, agent tools,
+                        memory-safe execution, and LM Studio integration are
+                        working today.
+                    </p>
+
+                    <div class="download-section reveal">
+                        <div class="download-label">Download Binary</div>
+                        <div class="download-grid">
+                            <button
+                                class="download-btn"
+                                disabled
+                                aria-label="Linux x64 download coming soon"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="20"
+                                        height="14"
+                                        rx="2"
+                                        ry="2"
+                                    />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
+                                Linux x64
+                            </button>
+                            <button
+                                class="download-btn"
+                                disabled
+                                aria-label="macOS ARM download coming soon"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="20"
+                                        height="14"
+                                        rx="2"
+                                        ry="2"
+                                    />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
+                                macOS ARM
+                            </button>
+                            <button
+                                class="download-btn"
+                                disabled
+                                aria-label="macOS x64 download coming soon"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="20"
+                                        height="14"
+                                        rx="2"
+                                        ry="2"
+                                    />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
+                                macOS x64
+                            </button>
+                            <button
+                                class="download-btn"
+                                disabled
+                                aria-label="Windows x64 download coming soon"
+                            >
+                                <svg
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <rect
+                                        x="2"
+                                        y="3"
+                                        width="20"
+                                        height="14"
+                                        rx="2"
+                                        ry="2"
+                                    />
+                                    <line x1="8" y1="21" x2="16" y2="21" />
+                                    <line x1="12" y1="17" x2="12" y2="21" />
+                                </svg>
+                                Windows x64
+                            </button>
+                        </div>
+                        <p class="download-note">
+                            Binaries coming soon. Build from source for now.
+                        </p>
+                    </div>
+
+                    <div class="hero-actions reveal">
+                        <a
+                            href="https://github.com/mskDev0092/ZiggyClaw"
+                            target="_blank"
+                            rel="noopener"
+                            class="btn btn-primary"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"
+                                />
+                            </svg>
+                            View on GitHub
+                        </a>
+                        <a href="#commands" class="btn btn-secondary"
+                            >View Documentation</a
+                        >
+                    </div>
+
+                    <div class="terminal-preview reveal">
+                        <div class="terminal-header">
+                            <div class="terminal-dot"></div>
+                            <div class="terminal-dot"></div>
+                            <div class="terminal-dot"></div>
+                        </div>
+                        <div class="terminal-body">
+                            <span class="terminal-line"
+                                ><span class="terminal-comment"
+                                    ># ZiggyClaw - Early Development</span
+                                ></span
+                            >
+                            <span class="terminal-line"
+                                ><span class="terminal-prompt">$</span
+                                ><span class="terminal-text"
+                                    >zig build run -- doctor</span
+                                ></span
+                            >
+                            <span class="terminal-line"
+                                ><span class="terminal-text"
+                                    >ZiggyClaw doctor: All systems OK</span
+                                ></span
+                            >
+                            <span class="terminal-line"
+                                ><span class="terminal-prompt">$</span
+                                ><span class="terminal-text"
+                                    >zig build run -- agent "read file: build.zig"</span
+                                ></span
+                            >
+                            <span class="terminal-line"
+                                ><span class="terminal-text"
+                                    >const std = @import("std");</span
+                                ></span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="commands">
+                <div class="container">
+                    <div class="section-tag reveal">Commands</div>
+                    <h2 class="section-title reveal">
+                        Everything at your fingertips
+                    </h2>
+                    <p class="section-desc reveal">
+                        Simple CLI commands to manage gateway, tools, agents,
+                        and system diagnostics.
+                    </p>
+
+                    <div class="cmd-table reveal">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Command</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>zig build run -- help</td>
+                                    <td>Show help and usage information</td>
+                                </tr>
+                                <tr>
+                                    <td>zig build run -- version</td>
+                                    <td>Show version info</td>
+                                </tr>
+                                <tr>
+                                    <td>zig build run -- gateway [start]</td>
+                                    <td>
+                                        Start the gateway server (port 18789)
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>zig build run -- tool list</td>
+                                    <td>List available tools</td>
+                                </tr>
+                                <tr>
+                                    <td>zig build run -- doctor</td>
+                                    <td>Run system diagnostics</td>
+                                </tr>
+                                <tr>
+                                    <td>zig build run -- onboard</td>
+                                    <td>Run onboarding process</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        zig build run -- agent &lt;message&gt;
+                                    </td>
+                                    <td>Run agent with a message</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="integration">
+                <div class="container">
+                    <div class="section-tag reveal">Integration</div>
+                    <h2 class="section-title reveal">Works with LM Studio</h2>
+                    <p class="section-desc reveal">
+                        Connect to a local LM Studio server for LLM inference
+                        with zero configuration.
+                    </p>
+
+                    <div class="integration-card reveal">
+                        <div class="integration-header">
+                            <div class="integration-icon">LM</div>
+                            <div>
+                                <div class="integration-title">
+                                    LM Studio Integration
+                                </div>
+                                <div class="integration-sub">
+                                    Local LLM inference via OpenAI-compatible
+                                    API
+                                </div>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <span class="code-comment"
+                                ># Set the API endpoint</span
+                            ><br />
+                            <span class="code-cmd">export </span
+                            ><span class="code-var">OPENAI_API_BASE</span
+                            ><span class="code-cmd"
+                                >="http://localhost:1234"</span
+                            ><br /><br />
+                            <span class="code-comment"
+                                ># Run with local model</span
+                            ><br />
+                            <span class="code-cmd"
+                                >zig build run -- agent "What is Zig?"</span
+                            >
+                        </div>
+                    </div>
+
+                    <div class="integration-card reveal">
+                        <div class="integration-header">
+                            <div
+                                class="integration-icon"
+                                style="
+                                    background: linear-gradient(
+                                        135deg,
+                                        #14162a,
+                                        #102040
+                                    );
+                                    color: #ff6b6b;
+                                "
+                            >
+                                GW
+                            </div>
+                            <div>
+                                <div class="integration-title">
+                                    Gateway Server
+                                </div>
+                                <div class="integration-sub">
+                                    OpenClaw-compatible HTTP API on port 18789
+                                </div>
+                            </div>
+                        </div>
+                        <div class="code-block">
+                            <span class="code-comment"># Start the gateway</span
+                            ><br />
+                            <span class="code-cmd"
+                                >zig build run -- gateway</span
+                            ><br /><br />
+                            <span class="code-comment"># Test the endpoint</span
+                            ><br />
+                            <span class="code-cmd"
+                                >curl
+                                http://127.0.0.1:18789/v1/chat/completions</span
+                            >
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="architecture">
+                <div class="container">
+                    <div class="section-tag reveal">Architecture</div>
+                    <h2 class="section-title reveal">Modular by design</h2>
+                    <p class="section-desc reveal">
+                        Clean separation of concerns for maintainability and
+                        extensibility.
+                    </p>
+
+                    <div class="arch-grid reveal">
+                        <div class="arch-item">
+                            <div class="arch-name">core</div>
+                            <div class="arch-desc">
+                                Gateway, session, agent, types
+                            </div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">tools</div>
+                            <div class="arch-desc">
+                                Tool registry (shell, file_read)
+                            </div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">security</div>
+                            <div class="arch-desc">Sandboxed execution</div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">config</div>
+                            <div class="arch-desc">
+                                Configuration management
+                            </div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">channels</div>
+                            <div class="arch-desc">IPC channels</div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">canvas</div>
+                            <div class="arch-desc">Canvas state management</div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">plugins</div>
+                            <div class="arch-desc">Plugin system</div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">cli</div>
+                            <div class="arch-desc">Command-line interface</div>
+                        </div>
+                        <div class="arch-item">
+                            <div class="arch-name">utils</div>
+                            <div class="arch-desc">Utilities</div>
+                        </div>
+                    </div>
+
+                    <p class="section-desc reveal" style="margin-top: 24px; font-size: 0.9rem;">
+                        <strong style="color: var(--accent);">Implemented:</strong>
+                        core, tools, security, cli, llm (LM Studio/Ollama/OpenAI).
+                        <strong style="color: var(--muted);">Planned:</strong>
+                        config, channels, canvas, plugins.
+                    </p>
+                </div>
+            </section>
+
+            <section id="requirements">
+                <div class="container">
+                    <div class="section-tag reveal">Requirements</div>
+                    <h2 class="section-title reveal">Get started</h2>
+                    <p class="section-desc reveal">
+                        All you need is Zig 0.14.0 or later.
+                    </p>
+
+                    <div class="code-block reveal" style="max-width: 450px">
+                        <span class="code-comment"># Clone and build</span
+                        ><br />
+                        <span class="code-cmd"
+                            >git clone
+                            https://github.com/mskDev0092/ZiggyClaw.git</span
+                        ><br />
+                        <span class="code-cmd">cd ZiggyClaw</span><br />
+                        <span class="code-cmd">zig build</span><br /><br />
+                        <span class="code-comment"># Run</span><br />
+                        <span class="code-cmd">zig build run -- help</span>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <div class="container">
+                <p class="footer-text">
+                    MIT Licensed &middot; Built with Zig &middot;
+                    <a
+                        href="https://github.com/mskDev0092/ZiggyClaw"
+                        target="_blank"
+                        rel="noopener"
+                        >View on GitHub</a
+                    >
+                </p>
+            </div>
+        </footer>
+
+        <script>
+            (function () {
+                var observer = new IntersectionObserver(
+                    function (entries) {
+                        entries.forEach(function (entry) {
+                            if (entry.isIntersecting) {
+                                entry.target.classList.add("visible");
+                                observer.unobserve(entry.target);
+                            }
+                        });
+                    },
+                    { threshold: 0.1, rootMargin: "0px 0px -30px 0px" },
+                );
+
+                var reveals = document.querySelectorAll(".reveal");
+                reveals.forEach(function (el) {
+                    observer.observe(el);
+                });
+            })();
+        </script>
+    </body>
+</html>
