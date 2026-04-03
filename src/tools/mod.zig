@@ -1,5 +1,10 @@
 pub const registry = @import("registry.zig");
 pub const shell = @import("shell.zig");
 pub const file_read = @import("file_read.zig");
+pub const write_file = @import("write_file.zig");
+pub const edit_file = @import("edit_file.zig");
+pub const list_directory = @import("list_directory.zig");
+pub const search_files = @import("search_files.zig");
+pub const find_files = @import("find_files.zig");
 pub const web_get = @import("web_get.zig");
 pub const search = @import("search.zig");
