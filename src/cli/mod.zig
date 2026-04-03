@@ -94,6 +94,11 @@ fn listTools(allocator: std.mem.Allocator) !void {
     // Register built-in tools
     try registry.register(tools.shell.getTool());
     try registry.register(tools.file_read.getTool());
+    try registry.register(tools.write_file.getTool());
+    try registry.register(tools.edit_file.getTool());
+    try registry.register(tools.list_directory.getTool());
+    try registry.register(tools.search_files.getTool());
+    try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
     try registry.register(tools.search.getTool());
 
@@ -214,6 +219,11 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     // Register built-in tools
     try registry.register(tools.shell.getTool());
     try registry.register(tools.file_read.getTool());
+    try registry.register(tools.write_file.getTool());
+    try registry.register(tools.edit_file.getTool());
+    try registry.register(tools.list_directory.getTool());
+    try registry.register(tools.search_files.getTool());
+    try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
     try registry.register(tools.search.getTool());
 
@@ -255,6 +265,11 @@ fn runPair(allocator: std.mem.Allocator) !void {
 
     try registry.register(tools.shell.getTool());
     try registry.register(tools.file_read.getTool());
+    try registry.register(tools.write_file.getTool());
+    try registry.register(tools.edit_file.getTool());
+    try registry.register(tools.list_directory.getTool());
+    try registry.register(tools.search_files.getTool());
+    try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
     try registry.register(tools.search.getTool());
 
