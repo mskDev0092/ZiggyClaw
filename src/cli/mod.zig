@@ -52,12 +52,17 @@ pub fn run(allocator: std.mem.Allocator) !void {
     }
 
     if (std.mem.eql(u8, subcommand, "onboard")) {
-        try std.io.getStdOut().writer().print("ZiggyClaw onboard complete. Ready to use.\n", .{});
+        try runOnboard(allocator);
         return;
     }
 
     if (std.mem.eql(u8, subcommand, "agent")) {
         try runAgent(allocator, &args);
+        return;
+    }
+
+    if (std.mem.eql(u8, subcommand, "pair")) {
+        try runPair(allocator);
         return;
     }
 
@@ -89,6 +94,8 @@ fn listTools(allocator: std.mem.Allocator) !void {
     // Register built-in tools
     try registry.register(tools.shell.getTool());
     try registry.register(tools.file_read.getTool());
+    try registry.register(tools.web_get.getTool());
+    try registry.register(tools.search.getTool());
 
     const stdout = std.io.getStdOut().writer();
     try stdout.print("Available tools:\n", .{});
@@ -101,7 +108,82 @@ fn listTools(allocator: std.mem.Allocator) !void {
 
 fn runDoctor() !void {
     const stdout = std.io.getStdOut().writer();
-    try stdout.print("ZiggyClaw doctor: All systems OK 🦞\n", .{});
+
+    try stdout.print(
+        \\
+        \\  🦞 ZiggyClaw Doctor
+        \\  ───────────────────
+        \\
+    , .{});
+
+    var env_map = try std.process.getEnvMap(std.heap.page_allocator);
+    defer env_map.deinit();
+
+    try stdout.print("  [4] LLM Configuration:\n", .{});
+    if (env_map.get("OPENAI_API_KEY")) |_| {
+        try stdout.print("      - OPENAI_API_KEY: set\n", .{});
+    } else {
+        try stdout.print("      - OPENAI_API_KEY: not set\n", .{});
+    }
+    if (env_map.get("OPENAI_API_BASE")) |base| {
+        try stdout.print("      - OPENAI_API_BASE: {s}\n", .{base});
+    } else {
+        try stdout.print("      - OPENAI_API_BASE: not set (defaults to OpenAI)\n", .{});
+    }
+
+    try stdout.print("\n  Status: All OK 🦞\n\n", .{});
+}
+
+fn runOnboard(allocator: std.mem.Allocator) !void {
+    _ = allocator;
+    const stdout = std.io.getStdOut().writer();
+
+    try stdout.print(
+        \\
+        \\  ╔══════════════════════════════════════════╗
+        \\  ║       🦞 Welcome to ZiggyClaw! ⚡        ║
+        \\  ╚══════════════════════════════════════════╝
+        \\
+        \\  ZiggyClaw is an AI agent framework with tools,
+        \\  LLM integration, and extensible architecture.
+        \\
+        \\  ───────────────────────────────────────────
+        \\  Quick Start:
+        \\  ───────────────────────────────────────────
+        \\
+    , .{});
+
+    try stdout.print("  1. Run agent:     {s}agent \"hello\"\n", .{"ziggyclaw "});
+    try stdout.print("  2. Start server: {s}gateway start\n", .{"ziggyclaw "});
+    try stdout.print("  3. List tools:   {s}tool list\n", .{"ziggyclaw "});
+    try stdout.print("  4. Run doctor:   {s}doctor\n", .{"ziggyclaw "});
+
+    try stdout.print(
+        \\
+        \\  ───────────────────────────────────────────
+        \\  Environment Setup (optional):
+        \\  ───────────────────────────────────────────
+        \\  OPENAI_API_KEY     - Your OpenAI API key
+        \\  OPENAI_API_BASE   - Custom LLM endpoint
+        \\  GATEWAY_PORT      - Server port (default 18789)
+        \\
+        \\  Supported LLM providers: OpenAI, Ollama, LM Studio
+        \\
+        \\  ───────────────────────────────────────────
+        \\  First Agent Test:
+        \\  ───────────────────────────────────────────
+        \\
+    , .{});
+
+    try stdout.print("  $ ziggyclaw agent \"shell: echo hello world\"\n\n", .{});
+
+    try stdout.print("  Try it now!\n", .{});
+
+    var buf: [10]u8 = undefined;
+    const input = std.io.getStdIn().reader().readUntilDelimiterOrEof(&buf, '\n') catch null;
+    _ = input;
+
+    try stdout.print("\n✅ Onboarding complete! Run 'ziggyclaw help' for more.\n", .{});
 }
 
 fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
@@ -132,6 +214,8 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     // Register built-in tools
     try registry.register(tools.shell.getTool());
     try registry.register(tools.file_read.getTool());
+    try registry.register(tools.web_get.getTool());
+    try registry.register(tools.search.getTool());
 
     const config = core.types.AgentConfig{
         .model = "cli-agent",
@@ -143,4 +227,66 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     const response = try agent.think("cli-session", message);
     defer allocator.free(response);
     try std.io.getStdOut().writer().print("{s}\n", .{response});
+}
+
+fn runPair(allocator: std.mem.Allocator) !void {
+    const stdout = std.io.getStdOut().writer();
+    const stdin = std.io.getStdIn();
+
+    try stdout.print(
+        \\
+        \\  ╔══════════════════════════════════════════╗
+        \\  ║     🦞 ZiggyClaw Pair Mode ⚡             ║
+        \\  ╚══════════════════════════════════════════╝
+        \\
+        \\  Entering interactive mode. Type your message
+        \\  and press Enter to chat with the agent.
+        \\  Press Ctrl+C or type 'exit' to quit.
+        \\
+        \\  ───────────────────────────────────────────
+        \\
+    , .{});
+
+    var session_manager = core.session.SessionManager.init(allocator);
+    defer session_manager.deinit();
+
+    var registry = tools.registry.ToolRegistry.init(allocator);
+    defer registry.deinit();
+
+    try registry.register(tools.shell.getTool());
+    try registry.register(tools.file_read.getTool());
+    try registry.register(tools.web_get.getTool());
+    try registry.register(tools.search.getTool());
+
+    const config = core.types.AgentConfig{ .model = "cli-agent" };
+    var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
+
+    var buffer: [4096]u8 = undefined;
+    while (true) {
+        try stdout.print("You> ", .{});
+
+        const bytes_read = stdin.read(&buffer) catch {
+            try stdout.print("\nGoodbye!\n", .{});
+            break;
+        };
+
+        if (bytes_read == 0) break;
+
+        const input = std.mem.trim(u8, buffer[0..bytes_read], "\n\r");
+
+        if (input.len == 0) continue;
+
+        if (std.mem.eql(u8, input, "exit") or std.mem.eql(u8, input, "quit")) {
+            try stdout.print("Goodbye!\n", .{});
+            break;
+        }
+
+        const response = agent.think("pair-session", input) catch {
+            try stdout.print("Error: Failed to get response\n", .{});
+            continue;
+        };
+        defer allocator.free(response);
+
+        try stdout.print("Agent> {s}\n\n", .{response});
+    }
 }

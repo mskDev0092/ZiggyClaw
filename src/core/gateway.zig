@@ -62,6 +62,8 @@ pub fn start(port: u16) !void {
     // Register built-in tools
     try registry.register(tools.shell.getTool());
     try registry.register(tools.file_read.getTool());
+    try registry.register(tools.web_get.getTool());
+    try registry.register(tools.search.getTool());
 
     const config = types.AgentConfig{
         .model = "gateway-agent",
