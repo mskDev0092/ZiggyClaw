@@ -192,6 +192,70 @@ pub const Agent = struct {
             }
         }
 
+        if (std.mem.indexOf(u8, user_message, "web_get") != null or std.mem.indexOf(u8, user_message, "http") != null) {
+            const ctx = types.ToolContext{
+                .allocator = self.allocator,
+                .session_id = session_id,
+            };
+
+            if (self.tool_registry.get("web_get")) |tool| {
+                var url: []const u8 = "";
+
+                if (std.mem.indexOf(u8, user_message, "web_get ")) |idx| {
+                    var start = idx + 8;
+                    while (start < user_message.len and user_message[start] == ' ') : (start += 1) {}
+                    var end = start;
+                    while (end < user_message.len and user_message[end] != ' ' and user_message[end] != '\n') : (end += 1) {}
+                    if (end > start) url = user_message[start..end];
+                }
+
+                if (url.len > 0) {
+                    const result = tool.execute(ctx, url);
+                    defer if (result.owned) self.allocator.free(result.data);
+
+                    if (result.success) {
+                        try sess.addMessage("assistant", result.data);
+                        return try self.allocator.dupe(u8, result.data);
+                    } else {
+                        const err_msg = result.error_msg orelse "tool failed";
+                        try sess.addMessage("assistant", err_msg);
+                        return try self.allocator.dupe(u8, err_msg);
+                    }
+                }
+            }
+        }
+
+        if (std.mem.indexOf(u8, user_message, "search") != null and std.mem.indexOf(u8, user_message, "web_get") == null) {
+            const ctx = types.ToolContext{
+                .allocator = self.allocator,
+                .session_id = session_id,
+            };
+
+            if (self.tool_registry.get("search")) |tool| {
+                var query: []const u8 = "";
+
+                if (std.mem.indexOf(u8, user_message, "search ")) |idx| {
+                    var start = idx + 7;
+                    while (start < user_message.len and user_message[start] == ' ') : (start += 1) {}
+                    var end = start;
+                    while (end < user_message.len and user_message[end] != ' ' and user_message[end] != '\n') : (end += 1) {}
+                    if (end > start) query = user_message[start..end];
+                }
+
+                const result = tool.execute(ctx, query);
+                defer if (result.owned) self.allocator.free(result.data);
+
+                if (result.success) {
+                    try sess.addMessage("assistant", result.data);
+                    return try self.allocator.dupe(u8, result.data);
+                } else {
+                    const err_msg = result.error_msg orelse "tool failed";
+                    try sess.addMessage("assistant", err_msg);
+                    return try self.allocator.dupe(u8, err_msg);
+                }
+            }
+        }
+
         const response = "ZiggyClaw agent ready (no tool triggered)";
         try sess.addMessage("assistant", response);
         return try self.allocator.dupe(u8, response);

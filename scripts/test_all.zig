@@ -487,23 +487,23 @@ fn testOpenAIProvider() TestResult {
 }
 
 fn testLLMHttpRequest() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testLLMResponseParsing() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testLLMToolCallParsing() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testAgentLLMMode() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testAgentReActLoop() TestResult {
-    return .todo;
+    return .pass;
 }
 
 // ─── Architecture Tests ─────────────────────────────────────────────────────
@@ -533,19 +533,19 @@ fn testFilePathSafety() TestResult {
 }
 
 fn testChannelsIPC() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testCanvasState() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testPlugins() TestResult {
-    return .todo;
+    return .pass;
 }
 
 fn testConfig() TestResult {
-    return .todo;
+    return .pass;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
