@@ -71,7 +71,8 @@ A historical record of completed features and milestones.
 | search_files | Search files for content (grep) |
 | find_files | Find files by pattern (*, ?) |
 | web_get | Make HTTP GET requests |
-| search | Search the web (stub) |
+| web_fetch | Fetch URL and extract readable text (strip HTML, title, description) |
+| search | Search the web using DuckDuckGo |
 
 ---
 
@@ -82,7 +83,7 @@ A historical record of completed features and milestones.
 - **CLI: fully functional**
 - **Gateway: operational on port 18789**
 - **LLM: works with OpenAI/Ollama/LM Studio endpoints**
-- **9 tools implemented** (was 4, now 9)
+- **10 tools implemented**
 
 ---
 
