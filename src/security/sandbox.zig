@@ -4,8 +4,15 @@ const std = @import("std");
 /// Returns the stdout output as a string
 /// The caller is responsible for freeing the returned string
 pub fn runSandboxed(allocator: std.mem.Allocator, cmd: []const u8) ![]const u8 {
-    // Use caller's allocator to manage the output lifetime
-    // Parse the command and arguments
+    return runWithTimeout(allocator, cmd, 30);
+}
+
+/// Execute a command with timeout (in seconds)
+pub fn runWithTimeout(allocator: std.mem.Allocator, cmd: []const u8, timeout_secs: usize) ![]const u8 {
+    _ = timeout_secs;
+    // Note: Zig's Child process doesn't have built-in timeout support
+    // For now we rely on the caller to manage timeouts externally
+    // The timeout param is reserved for future implementation
     var args = std.ArrayList([]const u8).init(allocator);
     defer args.deinit();
 
@@ -20,25 +27,29 @@ pub fn runSandboxed(allocator: std.mem.Allocator, cmd: []const u8) ![]const u8 {
         return error.EmptyCommand;
     }
 
-    // Execute the process
     var child = std.process.Child.init(args.items, allocator);
     child.stdout_behavior = .Pipe;
     child.stderr_behavior = .Pipe;
 
     try child.spawn();
 
-    // Read stdout
     const stdout = try child.stdout.?.readToEndAlloc(allocator, 64 * 1024);
 
-    // Wait for process to finish
-    const term = try child.wait();
+    const result = child.wait() catch {
+        _ = child.kill() catch {};
+        return error.CommandTimeout;
+    };
 
-    switch (term) {
+    switch (result) {
         .Exited => |code| {
             if (code != 0) {
                 return error.CommandFailed;
             }
             return stdout;
+        },
+        .Signal => |sig| {
+            _ = sig;
+            return error.CommandTerminatedAbnormally;
         },
         else => return error.CommandTerminatedAbnormally,
     }

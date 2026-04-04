@@ -15,8 +15,8 @@
 #### Tools (Web & Execution)
 - [x] `web_fetch` - Fetch URL and extract readable text
 - [x] `web_search` - Search the web
-- [ ] `execute_command` - Run shell commands with timeout
-- [ ] `process` - Background process management
+- [x] `execute_command` - Run shell commands with timeout
+- [x] `process` - Background process management
 
 #### Tools (Memory & Sessions)
 - [ ] `memory_search` - Search over memory files

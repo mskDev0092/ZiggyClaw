@@ -1,25 +1,27 @@
 const std = @import("std");
 const core = @import("core");
 
-fn encodeQuery(query: []const u8, allocator: std.mem.Allocator) []const u8 {
-    var result = std.ArrayList(u8).init(allocator);
-    for (query) |c| {
-        switch (c) {
-            ' ' => result.append('+') catch {},
-            '&', '#' => {
-                result.append('%') catch {};
-                result.appendSlice("2X") catch {};
-            },
-            else => {
-                if (c >= 'A' and c <= 'Z' or c >= 'a' and c <= 'z' or c >= '0' and c <= '9' or c == '-' or c == '_' or c == '.') {
-                    result.append(c) catch {};
-                } else {
-                    result.append('%') catch {};
-                }
-            },
+fn extractActualUrl(redirect_url: []const u8) ?[]const u8 {
+    const uddg_pos = std.mem.indexOf(u8, redirect_url, "uddg=") orelse return null;
+    const encoded_start = redirect_url[uddg_pos + 5 ..];
+    const amp_pos = std.mem.indexOf(u8, encoded_start, "&") orelse encoded_start.len;
+
+    var decoded = std.ArrayList(u8).init(std.heap.page_allocator);
+    var i: usize = 0;
+    while (i < amp_pos) {
+        if (encoded_start[i] == '%' and i + 2 < amp_pos) {
+            const hex = encoded_start[i + 1 .. i + 3];
+            const byte = std.fmt.parseInt(u8, hex, 16) catch null;
+            if (byte) |b| {
+                decoded.append(b) catch {};
+                i += 3;
+                continue;
+            }
         }
+        decoded.append(encoded_start[i]) catch {};
+        i += 1;
     }
-    return result.items;
+    return decoded.items;
 }
 
 fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult {
@@ -29,8 +31,19 @@ fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult 
         return .{ .success = false, .data = "", .error_msg = "Usage: search <query>" };
     }
 
-    const encoded = encodeQuery(query, ctx.allocator);
-    const search_url = std.fmt.allocPrint(ctx.allocator, "https://html.duckduckgo.com/html/?q={s}", .{encoded}) catch {
+    var encoded_query = std.ArrayList(u8).init(ctx.allocator);
+    defer encoded_query.deinit();
+    for (query) |c| {
+        if (c == ' ') {
+            encoded_query.append('+') catch {};
+        } else if (c >= 'A' and c <= 'Z' or c >= 'a' and c <= 'z' or c >= '0' and c <= '9' or c == '-' or c == '_' or c == '.') {
+            encoded_query.append(c) catch {};
+        } else {
+            encoded_query.append('_') catch {};
+        }
+    }
+
+    const search_url = std.fmt.allocPrint(ctx.allocator, "https://html.duckduckgo.com/html/?q={s}", .{encoded_query.items}) catch {
         return .{ .success = false, .data = "", .error_msg = "Failed to build search URL" };
     };
     defer ctx.allocator.free(search_url);
@@ -42,7 +55,7 @@ fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult 
     var client: std.http.Client = .{ .allocator = ctx.allocator };
     defer client.deinit();
 
-    var header_buf: [4096]u8 = undefined;
+    var header_buf: [8192]u8 = undefined;
 
     var req = client.open(.GET, uri, .{
         .server_header_buffer = &header_buf,
@@ -61,42 +74,56 @@ fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult 
         return .{ .success = false, .data = "", .error_msg = @errorName(err) };
     };
 
-    const html = req.reader().readAllAlloc(ctx.allocator, 1024 * 1024) catch |err| {
+    const html = req.reader().readAllAlloc(ctx.allocator, 512 * 1024) catch |err| {
         return .{ .success = false, .data = "", .error_msg = @errorName(err) };
     };
     defer ctx.allocator.free(html);
 
+    if (std.mem.indexOf(u8, html, "anomaly-modal") != null) {
+        return .{ .success = true, .data = "Search blocked by CAPTCHA. Use web_fetch with a specific URL instead.", .owned = false };
+    }
+
     var results = std.ArrayList(u8).init(ctx.allocator);
-    var idx: usize = 0;
+    defer results.deinit();
     var count: usize = 0;
+    var pos: usize = 0;
 
-    while (count < 8 and idx < html.len) {
-        const link_start = std.mem.indexOf(u8, html[idx..], "<a class=\"result__a\" href=\"");
-        if (link_start == null) break;
-        const url_start = idx + link_start.? + 27;
+    while (count < 8) {
+        const class_pos = std.mem.indexOf(u8, html[pos..], "class=\"result__a\"") orelse break;
+        const class_idx = pos + class_pos;
 
-        const url_end = std.mem.indexOf(u8, html[url_start..], "\"") orelse break;
-        const full_url = html[url_start .. url_start + url_end];
+        const href_pos = std.mem.indexOf(u8, html[class_idx..], "href=\"") orelse break;
+        const url_start = class_idx + href_pos + 6;
 
-        const title_start = std.mem.indexOf(u8, html[url_start + url_end ..], ">") orelse break;
-        const title_s = url_start + url_end + title_start + 1;
-        const title_end = std.mem.indexOf(u8, html[title_s..], "<") orelse break;
-        const title = std.mem.trim(u8, html[title_s .. title_s + title_end], " \t\n\r");
+        const url_end_quote = std.mem.indexOf(u8, html[url_start..], "\"") orelse break;
+        const redirect_url = html[url_start .. url_start + url_end_quote];
 
-        if (title.len > 0) {
+        const actual_url = extractActualUrl(redirect_url);
+
+        const gt_pos = std.mem.indexOf(u8, html[url_start + url_end_quote ..], ">") orelse break;
+        const title_start2 = url_start + url_end_quote + gt_pos + 1;
+
+        const lt_pos = std.mem.indexOf(u8, html[title_start2..], "<") orelse break;
+        const title = std.mem.trim(u8, html[title_start2 .. title_start2 + lt_pos], " \t\n\r");
+
+        if (title.len > 5) {
             results.appendSlice("• ") catch {};
             results.appendSlice(title) catch {};
             results.appendSlice("\n  ") catch {};
-            results.appendSlice(full_url) catch {};
+            if (actual_url) |url| {
+                results.appendSlice(url) catch {};
+            } else {
+                results.appendSlice(redirect_url) catch {};
+            }
             results.appendSlice("\n\n") catch {};
             count += 1;
         }
 
-        idx = url_start + url_end;
+        pos = title_start2 + lt_pos;
     }
 
     if (count == 0) {
-        return .{ .success = true, .data = "No search results found. Try refining your query or use web_fetch to visit specific URLs directly.", .owned = false };
+        return .{ .success = true, .data = "No search results found. Try using web_fetch with a specific URL.", .owned = false };
     }
 
     const header = std.fmt.allocPrint(ctx.allocator, "Search results for \"{s}\" (showing {d} results):\n\n", .{ query, count }) catch {
@@ -113,7 +140,7 @@ fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult 
 pub fn getTool() @import("registry.zig").ToolRegistry.Tool {
     return .{
         .name = "search",
-        .description = "Search the web using DuckDuckGo",
+        .description = "Search the web (DuckDuckGo). Usage: search <your query here>",
         .execute = execute,
     };
 }

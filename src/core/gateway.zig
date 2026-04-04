@@ -70,6 +70,8 @@ pub fn start(port: u16) !void {
     try registry.register(tools.web_get.getTool());
     try registry.register(tools.web_fetch.getTool());
     try registry.register(tools.search.getTool());
+    try registry.register(tools.execute_command.getTool());
+    try registry.register(tools.process.getTool());
 
     const config = types.AgentConfig{
         .model = "gateway-agent",
