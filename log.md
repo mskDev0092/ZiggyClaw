@@ -80,13 +80,24 @@ A historical record of completed features and milestones.
 
 ## Test Results
 
-- **38 tests passing**
+- **39 tests passing**
+- **4 skipped** (LLM provider-specific tests)
 - **Build: stable**
 - **CLI: fully functional**
 - **Gateway: operational on port 18789**
 - **LLM: works with OpenAI/Ollama/LM Studio endpoints**
-- **12 tools implemented**
+- **10 tools implemented**
+
+## Completed: Phase 8 – Testing & Stress Tests ✅
+
+- [x] Replaced all stub tests with real assertions (LLM + Architecture)
+- [x] Added stress tests (30x rapid commands, 20x file churn, 25x tool rotation)
+- [x] Path edge cases (10x)
+- [x] Shell edge cases (20x)
+- [x] GPA leak detection verified
+- [x] Updated README.md with stress test results
+- [x] Updated agent.md with test status
 
 ---
 
-*Last Updated: 2026-04-03*
+*Last Updated: 2026-04-04*
