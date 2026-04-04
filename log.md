@@ -73,6 +73,8 @@ A historical record of completed features and milestones.
 | web_get | Make HTTP GET requests |
 | web_fetch | Fetch URL and extract readable text (strip HTML, title, description) |
 | search | Search the web using DuckDuckGo |
+| execute_command | Run shell commands with timeout (ls, echo, pwd, cat, wc, grep, find, head, tail, sort, etc.) |
+| process | Manage background processes (start, list, stop, status) |
 
 ---
 
@@ -83,7 +85,7 @@ A historical record of completed features and milestones.
 - **CLI: fully functional**
 - **Gateway: operational on port 18789**
 - **LLM: works with OpenAI/Ollama/LM Studio endpoints**
-- **10 tools implemented**
+- **12 tools implemented**
 
 ---
 

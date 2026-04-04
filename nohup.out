@@ -1,0 +1,52 @@
+
+🦞⚡ ZiggyClaw (Zig-native OpenClaw clone)
+Fast. Safe. Claws Deep.
+
+✅ ZiggyClaw Gateway ready on http://127.0.0.1:18789
+   OpenClaw / RustClaw compatible (port 18789)
+   Try: curl http://127.0.0.1:18789/v1/chat/completions
+
+   Press Ctrl+C to stop
+[Agent] Using custom LLM base: http://localhost:1234
+[LLM] Sending request to http://localhost:1234
+[LLM] Request body: {"model":"gateway-agent","messages":[{"role":"user","content":"What is ZiggyClaw?"}],"tools":[{"type":"function","function":{"name":"write_file","description":"Create or overwrite a file with content (relative paths, max 64KB)"}},{"type":"function","function":{"name":"search_files","description":"Search files for content (case-insensitive grep)"}},{"type":"function","function":{"name":"find_files","description":"Find files by name pattern (* and ? wildcards)"}},{"type":"function","function":{"name":"web_get","description":"Make HTTP GET requests to fetch raw web content. Usage: web_get <url>"}},{"type":"function","function":{"name":"web_fetch","description":"Fetch a URL and extract readable text. Strips HTML, extracts title/description. Usage: web_fetch <url> [max_length]"}},{"type":"function","function":{"name":"search","description":"Search the web (DuckDuckGo). Usage: search <your query here>"}},{"type":"function","function":{"name":"edit_file","description":"Search and replace text in a file (first match only)"}},{"type":"function","function":{"name":"list_directory","description":"List directory contents (files, dirs, symlinks)"}},{"type":"function","function":{"name":"shell","description":"Run safe shell commands (ls, echo, pwd, cat, wc, grep only)"}},{"type":"function","function":{"name":"process","description":"Manage background processes. Usage: process <start|list|stop|status> [args]. start <cmd>: launch background process. list: show running processes. status <name>: check process info."}},{"type":"function","function":{"name":"file_read","description":"Read file contents (relative paths only, max 64KB)"}},{"type":"function","function":{"name":"execute_command","description":"Run shell commands with timeout. Usage: execute_command <cmd> [--timeout seconds]. Allowed: ls, echo, pwd, cat, wc, grep, find, head, tail, sort, etc. Max 60s timeout."}}]}
+error: ConnectionRefused
+/usr/lib/zig0.14/lib/std/net.zig:835:5: 0x1223953 in tcpConnectToHost (ziggyclaw)
+    return posix.ConnectError.ConnectionRefused;
+    ^
+/usr/lib/zig0.14/lib/std/http/Client.zig:1334:36: 0x1206541 in connectTcp (ziggyclaw)
+        error.ConnectionRefused => return error.ConnectionRefused,
+                                   ^
+/usr/lib/zig0.14/lib/std/http/Client.zig:1517:14: 0x11ec499 in connect (ziggyclaw)
+    } orelse return client.connectTcp(host, port, protocol);
+             ^
+/usr/lib/zig0.14/lib/std/http/Client.zig:1665:9: 0x11c60ea in open (ziggyclaw)
+        try client.connect(valid_uri.host.?.raw, uriPort(valid_uri, protocol), protocol);
+        ^
+/home/sk/1.DevSpace/ZiggyClaw/src/core/llm.zig:132:19: 0x11c4c4b in httpRequest (ziggyclaw)
+        var req = try client.open(.POST, try std.Uri.parse(url), .{
+                  ^
+/home/sk/1.DevSpace/ZiggyClaw/src/core/llm.zig:183:31: 0x11cc825 in callLLM (ziggyclaw)
+        const response_text = try self.httpRequest(full_url, body.items);
+                              ^
+/home/sk/1.DevSpace/ZiggyClaw/src/core/agent.zig:73:34: 0x11cda43 in think (ziggyclaw)
+            const llm_response = try llm.callLLM(sess.messages, tool_defs);
+                                 ^
+/home/sk/1.DevSpace/ZiggyClaw/src/core/gateway.zig:132:40: 0x11d102c in start (ziggyclaw)
+                const agent_response = try agent.think("http-session", user_message);
+                                       ^
+/home/sk/1.DevSpace/ZiggyClaw/src/cli/mod.zig:36:9: 0x11d8c08 in run (ziggyclaw)
+        try core.gateway.start(port);
+        ^
+/home/sk/1.DevSpace/ZiggyClaw/src/main.zig:12:5: 0x11d9577 in main (ziggyclaw)
+    try cli.run(allocator);
+    ^
+run
++- run ziggyclaw failure
+error: the following command exited with error code 1:
+/home/sk/1.DevSpace/ZiggyClaw/zig-out/bin/ziggyclaw gateway start 
+Build Summary: 3/5 steps succeeded; 1 failed
+run transitive failure
++- run ziggyclaw failure
+error: the following build command failed with exit code 1:
+/home/sk/1.DevSpace/ZiggyClaw/.zig-cache/o/b6e864662dc8ad9ab3d0e431989c150b/build /usr/lib/zig0.14/bin/zig /usr/lib/zig0.14/lib /home/sk/1.DevSpace/ZiggyClaw /home/sk/1.DevSpace/ZiggyClaw/.zig-cache /home/sk/.cache/zig --seed 0x93c720d5 -Zbb5aabc5261c9239 run -- gateway start

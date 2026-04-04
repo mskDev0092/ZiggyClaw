@@ -9,3 +9,5 @@ pub const find_files = @import("find_files.zig");
 pub const web_get = @import("web_get.zig");
 pub const web_fetch = @import("web_fetch.zig");
 pub const search = @import("search.zig");
+pub const execute_command = @import("execute_command.zig");
+pub const process = @import("process.zig");

@@ -63,7 +63,7 @@ fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResul
 pub fn getTool() @import("registry.zig").ToolRegistry.Tool {
     return .{
         .name = "web_get",
-        .description = "Make HTTP GET requests to fetch web content",
+        .description = "Make HTTP GET requests to fetch raw web content. Usage: web_get <url>",
         .execute = execute,
     };
 }

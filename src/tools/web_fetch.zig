@@ -193,7 +193,7 @@ fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResul
 pub fn getTool() @import("registry.zig").ToolRegistry.Tool {
     return .{
         .name = "web_fetch",
-        .description = "Fetch URL and extract readable text (strip HTML, get title/description)",
+        .description = "Fetch a URL and extract readable text. Strips HTML, extracts title/description. Usage: web_fetch <url> [max_length]",
         .execute = execute,
     };
 }
