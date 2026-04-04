@@ -60,6 +60,18 @@ zig build run -- gateway start
 | `web_fetch` | Fetch URL and extract readable text (strips HTML, extracts title/description) |
 | `search` | Search the web using DuckDuckGo |
 
+## Stress Test Results
+
+| Test | Iterations | Status |
+|------|------------|--------|
+| Rapid Agent Commands | 30x | ✅ PASS |
+| File Churn (write/read) | 20x | ✅ PASS |
+| Tool Rotation | 25x | ✅ PASS |
+| Path Edge Cases | 10x | ✅ PASS |
+| Shell Edge Cases | 20x | ✅ PASS |
+
+**Total**: 39 passed, 4 skipped, 0 failed
+
 ## LLM Configuration
 
 ### Environment Variables

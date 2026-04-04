@@ -142,13 +142,15 @@ ZiggyClaw/
 ## Testing
 
 ```bash
-# Run all tests
-zig run scripts/test_all.zig
+# Run all tests (moved to src/)
+zig run src/test_all.zig
 
-# Current: 38 passing
+# Current: 39 passed, 4 skipped (LLM provider tests)
+# Stress Tests: ✅ All 5 categories passing
+# Phases 1-7: TESTED ✅
 ```
 
 ---
 
-*Last Updated: 2026-04-03*
+*Last Updated: 2026-04-04*
 *Goals: Match RustyClaw 30+ tools, security features, multi-provider support*

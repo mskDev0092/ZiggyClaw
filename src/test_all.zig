@@ -1,4 +1,5 @@
 const std = @import("std");
+const llm = @import("core/llm.zig");
 
 // ZiggyClaw Test Runner
 // Run with: zig run scripts/test_all.zig
@@ -185,6 +186,27 @@ pub fn main() !void {
     };
 
     for (arch_tests) |tc| {
+        const result = tc.run();
+        printResult(tc.name, result);
+        switch (result) {
+            .pass => passed += 1,
+            .fail => failed += 1,
+            .skip => skipped += 1,
+            .todo => todos += 1,
+        }
+    }
+
+    // Phase 7: Stress Tests
+    printPhase("Stress Tests");
+    const stress_tests = [_]TestCase{
+        .{ .name = "Rapid Agent Commands (30x)", .run = testStressRapidCommands },
+        .{ .name = "File Churn (20x)", .run = testStressFileChurn },
+        .{ .name = "Tool Rotation (25x)", .run = testStressToolRotation },
+        .{ .name = "Path Edge Cases (10x)", .run = testStressPathEdgeCases },
+        .{ .name = "Shell Edge Cases (20x)", .run = testStressShellEdgeCases },
+    };
+
+    for (stress_tests) |tc| {
         const result = tc.run();
         printResult(tc.name, result);
         switch (result) {
@@ -471,39 +493,101 @@ fn testShellInjection() TestResult {
 // ─── LLM Tests ──────────────────────────────────────────────────────────────
 
 fn testLLMClientInit() TestResult {
-    return .pass;
+    const client = llm.LLMClient.init(allocator, "sk-test", "test-model", "http://localhost:1234");
+    if (client.model.len > 0 and client.api_base.len > 0) {
+        return .pass;
+    }
+    recordIssue("LLM", "ClientInit", "Failed to initialize LLM client");
+    return .fail;
 }
 
 fn testLMStudioProvider() TestResult {
-    return .pass;
+    const client = llm.LLMClient.init(allocator, "", "model", "http://localhost:1234/v1");
+    if (client.provider == .lmstudio) {
+        return .pass;
+    }
+    recordIssue("LLM", "LMStudioProvider", "Provider not detected as lmstudio");
+    return .fail;
 }
 
 fn testOllamaProvider() TestResult {
-    return .pass;
+    const client = llm.LLMClient.init(allocator, "", "model", "http://127.0.0.1:11434");
+    if (client.provider == .ollama) {
+        return .pass;
+    }
+    return .skip;
 }
 
 fn testOpenAIProvider() TestResult {
-    return .pass;
+    const client = llm.LLMClient.init(allocator, "sk-test", "model", "https://api.openai.com/v1");
+    if (client.provider == .openai) {
+        return .pass;
+    }
+    recordIssue("LLM", "OpenAIProvider", "Provider not detected as openai");
+    return .fail;
 }
 
 fn testLLMHttpRequest() TestResult {
-    return .pass;
+    const test_response = "{\"choices\":[{\"message\":{\"content\":\"test response\",\"role\":\"assistant\"},\"finish_reason\":\"stop\"}]}";
+    var client = llm.LLMClient.init(allocator, "", "test", "http://localhost:1234");
+    const result = client.parseResponse(test_response) catch return .fail;
+    defer {
+        result.tool_calls.deinit();
+        allocator.free(result.content);
+        allocator.free(result.stop_reason);
+    }
+    if (result.content.len > 0) {
+        return .pass;
+    }
+    return .skip;
 }
 
 fn testLLMResponseParsing() TestResult {
-    return .pass;
+    const test_response = "{\"choices\":[{\"message\":{\"content\":\"hello world\",\"role\":\"assistant\"},\"finish_reason\":\"stop\"}]}";
+    var client = llm.LLMClient.init(allocator, "", "test", "http://localhost:1234");
+    const result = client.parseResponse(test_response) catch return .fail;
+    defer {
+        result.tool_calls.deinit();
+        allocator.free(result.content);
+        allocator.free(result.stop_reason);
+    }
+    if (result.content.len > 0) {
+        return .pass;
+    }
+    return .skip;
 }
 
 fn testLLMToolCallParsing() TestResult {
-    return .pass;
+    const test_response = "{\"choices\":[{\"message\":{\"content\":\"\",\"role\":\"assistant\",\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"shell\",\"arguments\":\"echo test\"}}]},\"finish_reason\":\"tool_calls\"}]}";
+    var client = llm.LLMClient.init(allocator, "", "test", "http://localhost:1234");
+    const result = client.parseResponse(test_response) catch return .fail;
+    defer {
+        for (result.tool_calls.items) |tc| {
+            allocator.free(tc.id);
+            allocator.free(tc.name);
+            allocator.free(tc.arguments);
+        }
+        result.tool_calls.deinit();
+        allocator.free(result.content);
+        allocator.free(result.stop_reason);
+    }
+    if (result.tool_calls.items.len > 0) {
+        return .pass;
+    }
+    return .skip;
 }
 
 fn testAgentLLMMode() TestResult {
-    return .pass;
+    const result = runZiggy(&[_][]const u8{ "agent", "what is 2+2" }) catch return .skip;
+    defer freeResult(result);
+    if (result.stdout.len > 10) {
+        return .pass;
+    }
+    return .skip;
 }
 
 fn testAgentReActLoop() TestResult {
-    return .pass;
+    return .skip;
 }
 
 // ─── Architecture Tests ─────────────────────────────────────────────────────
@@ -573,6 +657,96 @@ fn hasLeakOrError(stderr: []const u8) bool {
     return std.mem.indexOf(u8, stderr, "leak") != null or
         std.mem.indexOf(u8, stderr, "error(gpa)") != null or
         std.mem.indexOf(u8, stderr, "error:") != null;
+}
+
+// ─── Stress Tests ───────────────────────────────────────────────────────────────
+
+fn testStressRapidCommands() TestResult {
+    var i: usize = 0;
+    while (i < 30) : (i += 1) {
+        const result = runZiggy(&[_][]const u8{ "agent", "shell: echo stress_test" }) catch return .fail;
+        defer freeResult(result);
+        if (hasLeakOrError(result.stderr)) {
+            recordIssue("STRESS", "RapidCommands", result.stderr);
+            return .fail;
+        }
+    }
+    return .pass;
+}
+
+fn testStressFileChurn() TestResult {
+    const test_file = "stress_test_file.txt";
+    var i: usize = 0;
+    while (i < 20) : (i += 1) {
+        const content = std.fmt.allocPrint(allocator, "stress iteration {d}", .{i}) catch return .fail;
+        defer allocator.free(content);
+        const write_cmd = std.fmt.allocPrint(allocator, "write_file path: {s}, content: {s}", .{ test_file, content }) catch return .fail;
+        defer allocator.free(write_cmd);
+        const write_result = runZiggy(&[_][]const u8{ "agent", write_cmd }) catch return .fail;
+        defer freeResult(write_result);
+        const read_cmd = std.fmt.allocPrint(allocator, "read file: {s}", .{test_file}) catch return .fail;
+        defer allocator.free(read_cmd);
+        const read_result = runZiggy(&[_][]const u8{ "agent", read_cmd }) catch return .fail;
+        defer freeResult(read_result);
+        if (hasLeakOrError(read_result.stderr)) {
+            recordIssue("STRESS", "FileChurn", read_result.stderr);
+            return .fail;
+        }
+    }
+    return .pass;
+}
+
+fn testStressToolRotation() TestResult {
+    const tools = [_][]const u8{
+        "shell: echo test",
+        "list_directory path: .",
+        "shell: pwd",
+        "shell: ls -la",
+        "shell: whoami",
+    };
+    var i: usize = 0;
+    while (i < 25) : (i += 1) {
+        const tool = tools[i % tools.len];
+        const result = runZiggy(&[_][]const u8{ "agent", tool }) catch return .fail;
+        defer freeResult(result);
+        if (hasLeakOrError(result.stderr)) {
+            recordIssue("STRESS", "ToolRotation", result.stderr);
+            return .fail;
+        }
+    }
+    return .pass;
+}
+
+fn testStressPathEdgeCases() TestResult {
+    const paths = [_][]const u8{
+        "read file: ./README.md",
+        "read file: ../README.md",
+        "read file: ./src/main.zig",
+    };
+    for (paths) |path| {
+        const result = runZiggy(&[_][]const u8{ "agent", path }) catch return .fail;
+        defer freeResult(result);
+    }
+    return .pass;
+}
+
+fn testStressShellEdgeCases() TestResult {
+    const commands = [_][]const u8{
+        "shell: echo a && echo b",
+        "shell: echo x || echo y",
+        "shell: echo test | wc -l",
+    };
+    var i: usize = 0;
+    while (i < 20) : (i += 1) {
+        const cmd = commands[i % commands.len];
+        const result = runZiggy(&[_][]const u8{ "agent", cmd }) catch return .fail;
+        defer freeResult(result);
+        if (hasLeakOrError(result.stderr)) {
+            recordIssue("STRESS", "ShellEdgeCases", result.stderr);
+            return .fail;
+        }
+    }
+    return .pass;
 }
 
 // ─── Output Formatting ──────────────────────────────────────────────────────

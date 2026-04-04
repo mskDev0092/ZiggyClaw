@@ -189,7 +189,7 @@ pub const LLMClient = struct {
         return try self.parseResponse(response_text);
     }
 
-    fn parseResponse(self: LLMClient, response: []const u8) !LLMResponse {
+    pub fn parseResponse(self: LLMClient, response: []const u8) !LLMResponse {
         var tool_calls = std.ArrayList(ToolCall).init(self.allocator);
         var content: []const u8 = "";
         var stop_reason: []const u8 = "";
