@@ -100,6 +100,7 @@ fn listTools(allocator: std.mem.Allocator) !void {
     try registry.register(tools.search_files.getTool());
     try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
+    try registry.register(tools.web_fetch.getTool());
     try registry.register(tools.search.getTool());
 
     const stdout = std.io.getStdOut().writer();
@@ -225,6 +226,7 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     try registry.register(tools.search_files.getTool());
     try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
+    try registry.register(tools.web_fetch.getTool());
     try registry.register(tools.search.getTool());
 
     const config = core.types.AgentConfig{
@@ -271,6 +273,7 @@ fn runPair(allocator: std.mem.Allocator) !void {
     try registry.register(tools.search_files.getTool());
     try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
+    try registry.register(tools.web_fetch.getTool());
     try registry.register(tools.search.getTool());
 
     const config = core.types.AgentConfig{ .model = "cli-agent" };

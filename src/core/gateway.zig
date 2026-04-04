@@ -68,6 +68,7 @@ pub fn start(port: u16) !void {
     try registry.register(tools.search_files.getTool());
     try registry.register(tools.find_files.getTool());
     try registry.register(tools.web_get.getTool());
+    try registry.register(tools.web_fetch.getTool());
     try registry.register(tools.search.getTool());
 
     const config = types.AgentConfig{
