@@ -8,7 +8,7 @@ A Zig-native AI agent framework - fast, safe, and claws deep into AI tooling.
 
 - **Agent System** - ReAct-style agent with tool calling and reasoning
 - **LLM Integration** - OpenAI, Ollama, LM Studio support
-- **Tool System** - 10 tools for file, shell, web operations
+- **Tool System** - 12 tools fully integrated + 2 manual tools (sessions, secrets)
 - **Gateway API** - OpenAI-compatible REST endpoint (port 18789)
 - **Security** - Sandboxed execution, path traversal protection
 - **Plugin System** - Dynamic .so/.dylib loading
@@ -45,20 +45,24 @@ zig build run -- gateway start
 | `pair` | Interactive chat mode |
 | `gateway start` | Start HTTP server |
 
-## Tools (10 available)
+## Tools (14 available)
 
-| Tool | Description |
-|------|-------------|
-| `shell` | Run safe shell commands (ls, echo, pwd, cat, wc, grep) |
-| `file_read` | Read file contents (relative paths, max 64KB) |
-| `write_file` | Create or overwrite files (max 64KB) |
-| `edit_file` | Search and replace in files |
-| `list_directory` | List directory contents |
-| `search_files` | Search files for content (grep-like) |
-| `find_files` | Find files by pattern (*, ? wildcards) |
-| `web_get` | Make HTTP GET requests |
-| `web_fetch` | Fetch URL and extract readable text (strips HTML, extracts title/description) |
-| `search` | Search the web using DuckDuckGo |
+| Tool | Description | Status |
+|------|-------------|--------|
+| `shell` | Run safe shell commands (ls, echo, pwd, cat, wc, grep) | ✅ Works |
+| `file_read` | Read file contents (relative paths, max 64KB) | ✅ Works |
+| `write_file` | Create or overwrite files (max 64KB) | ✅ Works |
+| `edit_file` | Search and replace in files | ✅ Works |
+| `list_directory` | List directory contents | ✅ Works |
+| `search_files` | Search files for content (grep-like) | ✅ Works |
+| `find_files` | Find files by pattern (*, ? wildcards) | ✅ Works |
+| `web_get` | Make HTTP GET requests | ✅ Works |
+| `web_fetch` | Fetch URL and extract readable text | ✅ Works |
+| `search` | Search the web using DuckDuckGo | ✅ Works |
+| `execute_command` | Run shell commands with timeout | ✅ Works |
+| `process` | Manage background processes | ✅ Works |
+| `sessions` | Manage agent sessions (list, send, spawn) | ⚠️ Manual only |
+| `secrets` | Manage secrets vault (list, get, store) | ⚠️ Manual only |
 
 ## Stress Test Results
 
@@ -70,7 +74,7 @@ zig build run -- gateway start
 | Path Edge Cases | 10x | ✅ PASS |
 | Shell Edge Cases | 20x | ✅ PASS |
 
-**Total**: 39 passed, 4 skipped, 0 failed
+**Total**: 40 passed, 0 failed, 5 skipped
 
 ## LLM Configuration
 

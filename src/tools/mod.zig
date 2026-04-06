@@ -11,3 +11,5 @@ pub const web_fetch = @import("web_fetch.zig");
 pub const search = @import("search.zig");
 pub const execute_command = @import("execute_command.zig");
 pub const process = @import("process.zig");
+pub const sessions = @import("sessions.zig");
+pub const secrets = @import("secrets.zig");
