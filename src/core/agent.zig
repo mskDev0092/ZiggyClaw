@@ -71,25 +71,32 @@ pub const Agent = struct {
             defer self.allocator.free(tool_defs);
 
             const llm_response = try llm.callLLM(sess.messages, tool_defs);
+            std.debug.print("[Agent] Response - content: '{s}', reasoning: '{s}', tool_calls: {d}, stop_reason: '{s}'\n", .{ llm_response.content, llm_response.reasoning_content orelse "", llm_response.tool_calls.items.len, llm_response.stop_reason });
             defer {
                 self.allocator.free(llm_response.content);
                 self.allocator.free(llm_response.stop_reason);
                 llm_response.tool_calls.deinit();
+                if (llm_response.reasoning_content) |r| self.allocator.free(r);
             }
 
             if (llm_response.content.len > 0) {
                 try sess.addMessage("assistant", llm_response.content);
             }
 
+            // If no tool calls, return content/reasoning
             if (llm_response.tool_calls.items.len == 0) {
                 if (llm_response.content.len > 0) {
                     return try self.allocator.dupe(u8, llm_response.content);
+                } else if (llm_response.reasoning_content) |reasoning| {
+                    return try self.allocator.dupe(u8, reasoning);
                 } else {
                     return try self.allocator.dupe(u8, "Agent completed reasoning");
                 }
             }
 
+            // Execute tool calls
             for (llm_response.tool_calls.items) |tool_call| {
+                std.debug.print("[Agent] Executing tool: {s}\n", .{tool_call.name});
                 if (self.tool_registry.get(tool_call.name)) |tool| {
                     const ctx = types.ToolContext{
                         .allocator = self.allocator,
@@ -103,11 +110,16 @@ pub const Agent = struct {
                 }
             }
 
-            if (std.mem.eql(u8, llm_response.stop_reason, "end_turn")) {
+            if (std.mem.eql(u8, llm_response.stop_reason, "end_turn") or
+                std.mem.eql(u8, llm_response.stop_reason, "stop") or
+                llm_response.tool_calls.items.len == 0)
+            {
                 if (llm_response.content.len > 0) {
                     return try self.allocator.dupe(u8, llm_response.content);
+                } else if (llm_response.reasoning_content) |reasoning| {
+                    return try self.allocator.dupe(u8, reasoning);
                 } else {
-                    return try self.allocator.dupe(u8, "Agent completed with tool calls");
+                    return try self.allocator.dupe(u8, "Agent completed");
                 }
             }
         }
