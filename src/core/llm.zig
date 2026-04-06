@@ -18,6 +18,7 @@ pub const LLMResponse = struct {
     content: []const u8,
     tool_calls: std.ArrayList(ToolCall),
     stop_reason: []const u8,
+    reasoning_content: ?[]const u8 = null,
 };
 
 pub const LLMClient = struct {
@@ -193,6 +194,7 @@ pub const LLMClient = struct {
         var tool_calls = std.ArrayList(ToolCall).init(self.allocator);
         var content: []const u8 = "";
         var stop_reason: []const u8 = "";
+        var reasoning_content: ?[]const u8 = null;
 
         // Allocate default strings that will be owned by the caller
         content = try self.allocator.dupe(u8, "");
@@ -220,41 +222,59 @@ pub const LLMClient = struct {
 
         // Parse tool_calls if present
         if (std.mem.indexOf(u8, response, "\"tool_calls\":") != null) {
-            var idx: usize = 0;
-            while (idx < response.len) {
-                if (std.mem.indexOf(u8, response[idx..], "\"function\":{")) |func_start| {
-                    const after_func = idx + func_start + 12; // skip past "function":{
-                    if (after_func < response.len) {
-                        // Extract name
-                        if (std.mem.indexOf(u8, response[after_func..], "\"name\":\"") != null) {
-                            const name_start = after_func + 7;
-                            if (name_start < response.len) {
-                                if (std.mem.indexOf(u8, response[name_start..], "\"")) |name_end| {
-                                    const name = response[name_start .. name_start + name_end];
+            std.debug.print("[LLM] Parsing tool_calls...\n", .{});
 
-                                    // Extract arguments after "arguments":"
-                                    if (std.mem.indexOf(u8, response[after_func..], "\"arguments\":\"") != null) {
-                                        const args_start = after_func + 13;
-                                        if (args_start < response.len) {
-                                            if (std.mem.indexOf(u8, response[args_start..], "\"}")) |args_end| {
-                                                const args = response[args_start .. args_start + args_end];
+            // Find all function definitions with name and arguments
+            std.debug.print("[LLM] Looking for name patterns in response...\n", .{});
+            var search_idx: usize = 0;
+            var name_count: usize = 0;
+            while (search_idx < response.len) {
+                // Look for "name":" pattern
+                const name_pattern = "\"name\":\"";
+                if (std.mem.indexOf(u8, response[search_idx..], name_pattern)) |name_pos| {
+                    name_count += 1;
+                    const name_start = search_idx + name_pos + name_pattern.len;
+                    var name_end = name_start;
+                    while (name_end < response.len and response[name_end] != '"') {
+                        name_end += 1;
+                    }
 
-                                                try tool_calls.append(.{
-                                                    .id = try std.fmt.allocPrint(self.allocator, "call_{d}", .{tool_calls.items.len}),
-                                                    .name = try self.allocator.dupe(u8, name),
-                                                    .arguments = try self.allocator.dupe(u8, args),
-                                                });
-                                            }
-                                        }
-                                    }
+                    std.debug.print("[LLM] Found name at pos {d}-{d}\n", .{ name_start, name_end });
+
+                    if (name_end > name_start and name_end < response.len) {
+                        const tool_name = response[name_start..name_end];
+                        std.debug.print("[LLM] Found tool name: '{s}'\n", .{tool_name});
+
+                        // Find arguments - look for "arguments":" after the name
+                        const after_name = name_end + 1;
+                        if (after_name + 13 < response.len) {
+                            const args_pattern = "\",\"arguments\":\"";
+                            if (std.mem.indexOf(u8, response[after_name..], args_pattern)) |args_pos| {
+                                const args_start = after_name + args_pos + 13;
+                                var args_end = args_start;
+                                while (args_end < response.len and response[args_end] != '"') {
+                                    args_end += 1;
+                                }
+
+                                if (args_end > args_start) {
+                                    const tool_args = response[args_start..args_end];
+                                    std.debug.print("[LLM] Found args: '{s}'\n", .{tool_args});
+
+                                    try tool_calls.append(.{
+                                        .id = try std.fmt.allocPrint(self.allocator, "call_{d}", .{tool_calls.items.len}),
+                                        .name = try self.allocator.dupe(u8, tool_name),
+                                        .arguments = try self.allocator.dupe(u8, tool_args),
+                                    });
                                 }
                             }
                         }
                     }
+                    search_idx = name_end + 1;
+                } else {
                     break;
                 }
-                idx += 1;
             }
+            std.debug.print("[LLM] Total tool calls parsed: {d}\n", .{tool_calls.items.len});
         }
 
         // Try to extract finish_reason
@@ -270,10 +290,25 @@ pub const LLMClient = struct {
             }
         }
 
+        // Parse reasoning_content if present (LM Studio / some OpenAI-compatible models)
+        if (std.mem.indexOf(u8, response, "\"reasoning_content\":") != null) {
+            if (std.mem.indexOf(u8, response, "\"reasoning_content\":\"") != null) {
+                const reason_start_idx = std.mem.indexOf(u8, response, "\"reasoning_content\":\"").? + 20;
+                if (reason_start_idx < response.len and response[reason_start_idx] == '"') {
+                    var reason_end = reason_start_idx + 1;
+                    while (reason_end < response.len and response[reason_end] != '"') : (reason_end += 1) {}
+                    if (reason_end < response.len) {
+                        reasoning_content = try self.allocator.dupe(u8, response[reason_start_idx + 1 .. reason_end]);
+                    }
+                }
+            }
+        }
+
         return .{
             .content = content,
             .tool_calls = tool_calls,
             .stop_reason = stop_reason,
+            .reasoning_content = reasoning_content,
         };
     }
 };
