@@ -12,24 +12,19 @@
 - [x] `search_files` - Grep-like content search
 - [x] `find_files` - Find files by name/glob
 
-#### Tools (Web & Execution)
-- [x] `web_fetch` - Fetch URL and extract readable text
-- [x] `web_search` - Search the web
-- [x] `execute_command` - Run shell commands with timeout
-- [x] `process` - Background process management
+#### Tools (Web & Execution) - DONE ✅
+#### Tools (Memory & Sessions) - PARTIAL
+- [x] `memory_search` - Search over memory files (module exists, not exposed as tool)
+- [ ] `memory_get` - Retrieve memory snippets (not exposed as tool)
+- [x] `sessions_list` - List active sessions (works, not auto-triggered by agent)
+- [x] `sessions_spawn` - Spawn sub-agent tasks (works, not auto-triggered by agent)
+- [x] `sessions_send` - Send messages to sessions (works, not auto-triggered by agent)
 
-#### Tools (Memory & Sessions)
-- [ ] `memory_search` - Search over memory files
-- [ ] `memory_get` - Retrieve memory snippets
-- [ ] `sessions_list` - List active sessions
-- [ ] `sessions_spawn` - Spawn sub-agent tasks
-- [ ] `sessions_send` - Send messages to sessions
-
-#### Tools (System)
-- [ ] `secrets_list` - List secrets from vault
-- [ ] `secrets_get` - Retrieve secret by key
-- [ ] `secrets_store` - Store encrypted secret
-- [ ] `gateway` - Config get/apply/patch, restart
+#### Tools (System) - PARTIAL
+- [x] `secrets_list` - List secrets from vault (works, not auto-triggered by agent)
+- [x] `secrets_get` - Retrieve secret by key (works, not auto-triggered by agent)
+- [x] `secrets_store` - Store encrypted secret (works, not auto-triggered by agent)
+- [x] `gateway` - Config get/apply/patch, restart
 
 ---
 
@@ -135,7 +130,32 @@ ZiggyClaw/
 3. **Add memory system** - BM25 search over memory files
 4. **Add secrets vault** - Encrypted credential storage
 
-## Alaways move done to /log.md
+---
+
+### Milestones & Plan
+
+Objective: Align ZiggyClaw with parity goals and establish concrete milestones, ownership, and acceptance criteria before major coding efforts.
+
+- Milestones
+  - M0: Documentation alignment completed (this doc updated) — DONE
+  - M1: Memory module skeleton added (src/memory/mod.zig) — DONE
+  - M2: Memory store API skeleton (put/get) created — PENDING
+  - M3: Integrate memory path into tests (test harness adjustments) — PENDING
+  - M4: Implement BM25-style search skeleton and indexing — PENDING
+  - M5: Achieve parity for all P0 features in Target Parity Matrix — PENDING
+
+- Acceptance Criteria (per milestone)
+  - AC1 (M1): Memory module exists and builds; no compile errors; exports a Memory type with init(allocator) signature.
+  - AC2 (M2): Memory API skeleton present (put/get) and wired to allocate memory; basic usage in tests compiles.
+  - AC3 (M3): Tests compile; Memory path covered in test harness; no leaks introduced.
+  - AC4 (M4): BM25 skeleton exists; can index dummy docs; search returns results (not full ranking yet).
+  - AC5 (M5): All P0 features demonstrated as working in a proof-of-concept (at least unit/integration tests).
+
+- Ownership & Schedule
+  - Owner: (AI-driven guidance)
+  - Target dates: Milestones targeted over next 2-3 sprints; review weekly.
+
+## Always move done to /log.md
 
 ---
 

@@ -104,6 +104,8 @@ fn listTools(allocator: std.mem.Allocator) !void {
     try registry.register(tools.search.getTool());
     try registry.register(tools.execute_command.getTool());
     try registry.register(tools.process.getTool());
+    try registry.register(tools.sessions.getTool());
+    try registry.register(tools.secrets.getTool());
 
     const stdout = std.io.getStdOut().writer();
     try stdout.print("Available tools:\n", .{});
@@ -232,6 +234,10 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     try registry.register(tools.search.getTool());
     try registry.register(tools.execute_command.getTool());
     try registry.register(tools.process.getTool());
+    try registry.register(tools.sessions.getTool());
+    tools.sessions.setGlobalManager(&session_manager, allocator);
+    try registry.register(tools.secrets.getTool());
+    tools.secrets.initSecrets(allocator);
 
     const config = core.types.AgentConfig{
         .model = "cli-agent",
@@ -281,6 +287,10 @@ fn runPair(allocator: std.mem.Allocator) !void {
     try registry.register(tools.search.getTool());
     try registry.register(tools.execute_command.getTool());
     try registry.register(tools.process.getTool());
+    try registry.register(tools.sessions.getTool());
+    tools.sessions.setGlobalManager(&session_manager, allocator);
+    try registry.register(tools.secrets.getTool());
+    tools.secrets.initSecrets(allocator);
 
     const config = core.types.AgentConfig{ .model = "cli-agent" };
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
