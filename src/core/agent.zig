@@ -4,6 +4,8 @@ const tools = @import("tools");
 const session_mod = @import("session.zig");
 const core_llm = @import("llm.zig");
 
+const DEFAULT_SYSTEM_PROMPT = "You are an AI assistant. Use tools when user asks to do tasks.";
+
 pub const Agent = struct {
     config: types.AgentConfig,
     session_manager: *session_mod.SessionManager,
@@ -66,11 +68,13 @@ pub const Agent = struct {
                 self.config.model,
                 api_base,
             );
+            var llm_with_system = llm;
+            llm_with_system.system_prompt = self.config.system_prompt orelse DEFAULT_SYSTEM_PROMPT;
 
-            const tool_defs = try llm.buildToolDefinitions(self.tool_registry);
+            const tool_defs = try llm_with_system.buildToolDefinitions(self.tool_registry);
             defer self.allocator.free(tool_defs);
 
-            const llm_response = try llm.callLLM(sess.messages, tool_defs);
+            const llm_response = try llm_with_system.callLLM(sess.messages, tool_defs);
             std.debug.print("[Agent] Response - content: '{s}', reasoning: '{s}', tool_calls: {d}, stop_reason: '{s}'\n", .{ llm_response.content, llm_response.reasoning_content orelse "", llm_response.tool_calls.items.len, llm_response.stop_reason });
             defer {
                 self.allocator.free(llm_response.content);
