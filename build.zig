@@ -16,10 +16,12 @@ pub fn build(b: *std.Build) void {
     const tools = b.addModule("tools", .{ .root_source_file = b.path("src/tools/mod.zig") });
     tools.addImport("core", core);
     const security = b.addModule("security", .{ .root_source_file = b.path("src/security/mod.zig") });
+    const memory = b.addModule("memory", .{ .root_source_file = b.path("src/memory/mod.zig") });
     core.addImport("tools", tools);
     core.addImport("security", security);
     const config = b.addModule("config", .{ .root_source_file = b.path("src/config/mod.zig") });
     tools.addImport("security", security);
+    tools.addImport("memory", memory);
     const channels = b.addModule("channels", .{ .root_source_file = b.path("src/channels/mod.zig") });
     const canvas = b.addModule("canvas", .{ .root_source_file = b.path("src/canvas/mod.zig") });
     const plugins = b.addModule("plugins", .{ .root_source_file = b.path("src/plugins/mod.zig") });
@@ -27,6 +29,7 @@ pub fn build(b: *std.Build) void {
     cli.addImport("core", core);
     cli.addImport("config", config);
     cli.addImport("tools", tools);
+    cli.addImport("memory", memory);
     const utils = b.addModule("utils", .{ .root_source_file = b.path("src/utils/mod.zig") });
 
     exe.root_module.addImport("core", core);

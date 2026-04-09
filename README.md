@@ -45,24 +45,25 @@ zig build run -- gateway start
 | `pair` | Interactive chat mode |
 | `gateway start` | Start HTTP server |
 
-## Tools (14 available)
+## Tools (15 available)
 
-| Tool | Description | Status |
-|------|-------------|--------|
-| `shell` | Run safe shell commands (ls, echo, pwd, cat, wc, grep) | ✅ Works |
-| `file_read` | Read file contents (relative paths, max 64KB) | ✅ Works |
-| `write_file` | Create or overwrite files (max 64KB) | ✅ Works |
-| `edit_file` | Search and replace in files | ✅ Works |
-| `list_directory` | List directory contents | ✅ Works |
-| `search_files` | Search files for content (grep-like) | ✅ Works |
-| `find_files` | Find files by pattern (*, ? wildcards) | ✅ Works |
-| `web_get` | Make HTTP GET requests | ✅ Works |
-| `web_fetch` | Fetch URL and extract readable text | ✅ Works |
-| `search` | Search the web using DuckDuckGo | ✅ Works |
-| `execute_command` | Run shell commands with timeout | ✅ Works |
-| `process` | Manage background processes | ✅ Works |
-| `sessions` | Manage agent sessions (list, send, spawn) | ⚠️ Manual only |
-| `secrets` | Manage secrets vault (list, get, store) | ⚠️ Manual only |
+| Tool | Description | Integration |
+|------|-------------|-------------|
+| `shell` | Run safe shell commands | ✅ Auto-triggered |
+| `file_read` | Read file contents | ✅ Auto-triggered |
+| `write_file` | Create or overwrite files | ✅ Auto-triggered |
+| `edit_file` | Search and replace in files | ✅ Auto-triggered |
+| `list_directory` | List directory contents | ✅ Auto-triggered |
+| `search_files` | Search files for content | ✅ Auto-triggered |
+| `find_files` | Find files by pattern | ✅ Auto-triggered |
+| `web_get` | Make HTTP GET requests | ✅ Auto-triggered |
+| `web_fetch` | Fetch URL and extract text | ✅ Auto-triggered |
+| `search` | Search the web | ✅ Auto-triggered |
+| `execute_command` | Run shell with timeout | ✅ Auto-triggered |
+| `process` | Manage background processes | ✅ Auto-triggered |
+| `sessions` | Manage agent sessions | ✅ With LLM |
+| `secrets` | Manage secrets vault | ✅ With LLM |
+| `memory` | In-memory store (get/put/index/search) | ✅ With LLM |
 
 ## Stress Test Results
 
@@ -97,6 +98,10 @@ export GATEWAY_PORT=18789
 - **LM Studio** - `http://localhost:1234/v1/chat/completions`
 - **Ollama** - `http://localhost:11434/api/chat`
 - **OpenAI** - `https://api.openai.com/v1` (default)
+- **Anthropic** - `https://api.anthropic.com/v1`
+- **Google Gemini** - `https://generativelanguage.googleapis.com/v1`
+- **OpenRouter** - `https://openrouter.ai/v1`
+- **xAI Grok** - `https://api.x.ai/v1`
 
 ## Usage Examples
 

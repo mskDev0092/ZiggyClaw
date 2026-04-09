@@ -37,6 +37,8 @@ pub const AgentConfig = struct {
     temperature: f32 = 0.7,
     system_prompt: ?[]const u8 = null,
     max_context_messages: usize = 50,
+    max_tokens: ?usize = null,
+    track_token_usage: bool = false,
 };
 
 pub const ReasoningStep = struct {

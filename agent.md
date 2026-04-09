@@ -13,17 +13,16 @@
 - [x] `find_files` - Find files by name/glob
 
 #### Tools (Web & Execution) - DONE ✅
-#### Tools (Memory & Sessions) - PARTIAL
-- [x] `memory_search` - Search over memory files (module exists, not exposed as tool)
-- [ ] `memory_get` - Retrieve memory snippets (not exposed as tool)
-- [x] `sessions_list` - List active sessions (works, not auto-triggered by agent)
-- [x] `sessions_spawn` - Spawn sub-agent tasks (works, not auto-triggered by agent)
-- [x] `sessions_send` - Send messages to sessions (works, not auto-triggered by agent)
+#### Tools (Memory & Sessions) - DONE ✅
+- [x] `memory` - In-memory store (get, put, index, search)
+- [x] `sessions_list` - List active sessions
+- [x] `sessions_spawn` - Spawn sub-agent tasks
+- [x] `sessions_send` - Send messages to sessions
 
-#### Tools (System) - PARTIAL
-- [x] `secrets_list` - List secrets from vault (works, not auto-triggered by agent)
-- [x] `secrets_get` - Retrieve secret by key (works, not auto-triggered by agent)
-- [x] `secrets_store` - Store encrypted secret (works, not auto-triggered by agent)
+#### Tools (System) - DONE ✅
+- [x] `secrets_list` - List secrets from vault
+- [x] `secrets_get` - Retrieve secret by key
+- [x] `secrets_store` - Store encrypted secret
 - [x] `gateway` - Config get/apply/patch, restart
 
 ---
@@ -35,15 +34,15 @@
 - [ ] LeakDetector - Block credential exfiltration
 - [ ] SSRF Protection - Block private IP requests
 
-#### Multi-Provider Support
-- [ ] Anthropic provider (Claude)
-- [ ] Google provider (Gemini)
-- [ ] OpenRouter support
-- [ ] xAI provider (Grok)
+#### Multi-Provider Support - DONE ✅
+- [x] Anthropic provider (Claude)
+- [x] Google provider (Gemini)
+- [x] OpenRouter support
+- [x] xAI provider (Grok)
 
-#### Context Management
+#### Context Management - DONE ✅
+- [x] Token usage tracking
 - [ ] Context compaction (auto-summarize at 75%)
-- [ ] Token usage tracking
 - [ ] Model context window limits
 
 ---

@@ -139,7 +139,7 @@ pub const Memory = struct {
         if (results.items.len > limit) {
             return results.items[0..limit];
         }
-        return results.toOwnedSlice();
+        return results.toOwnedSlice() catch return &[_]Document{};
     }
 
     pub fn deinit(self: *Memory) void {

@@ -6,6 +6,10 @@ pub const ProviderType = enum {
     openai,
     ollama,
     lmstudio,
+    anthropic,
+    google,
+    openrouter,
+    xai,
 };
 
 pub const ToolCall = struct {
@@ -19,6 +23,13 @@ pub const LLMResponse = struct {
     tool_calls: std.ArrayList(ToolCall),
     stop_reason: []const u8,
     reasoning_content: ?[]const u8 = null,
+    usage: ?TokenUsage = null,
+};
+
+pub const TokenUsage = struct {
+    prompt_tokens: usize = 0,
+    completion_tokens: usize = 0,
+    total_tokens: usize = 0,
 };
 
 pub const LLMClient = struct {
@@ -36,8 +47,16 @@ pub const LLMClient = struct {
     ) LLMClient {
         const provider = if (std.mem.indexOf(u8, api_base, "ollama") != null)
             ProviderType.ollama
-        else if (std.mem.indexOf(u8, api_base, "lmstudio") != null or std.mem.indexOf(u8, api_base, "localhost") != null)
+        else if (std.mem.indexOf(u8, api_base, "lmstudio") != null or std.mem.indexOf(u8, api_base, "localhost:1234") != null)
             ProviderType.lmstudio
+        else if (std.mem.indexOf(u8, api_base, "anthropic") != null or std.mem.indexOf(u8, api_base, "api.anthropic") != null)
+            ProviderType.anthropic
+        else if (std.mem.indexOf(u8, api_base, "google") != null or std.mem.indexOf(u8, api_base, "generativelanguage") != null)
+            ProviderType.google
+        else if (std.mem.indexOf(u8, api_base, "openrouter") != null or std.mem.indexOf(u8, api_base, "openrouter.ai") != null)
+            ProviderType.openrouter
+        else if (std.mem.indexOf(u8, api_base, "x.ai") != null or std.mem.indexOf(u8, api_base, "xai") != null)
+            ProviderType.xai
         else
             ProviderType.openai;
 
@@ -176,6 +195,10 @@ pub const LLMClient = struct {
             .ollama => "/api/chat",
             .lmstudio => "/v1/chat/completions",
             .openai => "/v1/chat/completions",
+            .anthropic => "/v1/messages",
+            .google => "/v1beta/models/{s}:generateContent",
+            .openrouter => "/v1/chat/completions",
+            .xai => "/v1/chat/completions",
         };
 
         const full_url = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ self.api_base, endpoint });

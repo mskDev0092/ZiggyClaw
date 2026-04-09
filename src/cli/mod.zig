@@ -1,6 +1,7 @@
 const std = @import("std");
 const core = @import("core");
 const tools = @import("tools");
+const memory_mod = @import("memory");
 
 pub fn run(allocator: std.mem.Allocator) !void {
     var args = try std.process.argsWithAllocator(allocator);
@@ -106,6 +107,7 @@ fn listTools(allocator: std.mem.Allocator) !void {
     try registry.register(tools.process.getTool());
     try registry.register(tools.sessions.getTool());
     try registry.register(tools.secrets.getTool());
+    try registry.register(tools.memory.getTool());
 
     const stdout = std.io.getStdOut().writer();
     try stdout.print("Available tools:\n", .{});
@@ -238,6 +240,9 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     tools.sessions.setGlobalManager(&session_manager, allocator);
     try registry.register(tools.secrets.getTool());
     tools.secrets.initSecrets(allocator);
+    try registry.register(tools.memory.getTool());
+    var mem = memory_mod.Memory.init(allocator);
+    tools.memory.setGlobalMemory(&mem, allocator);
 
     const config = core.types.AgentConfig{
         .model = "cli-agent",
@@ -291,6 +296,9 @@ fn runPair(allocator: std.mem.Allocator) !void {
     tools.sessions.setGlobalManager(&session_manager, allocator);
     try registry.register(tools.secrets.getTool());
     tools.secrets.initSecrets(allocator);
+    try registry.register(tools.memory.getTool());
+    var mem = memory_mod.Memory.init(allocator);
+    tools.memory.setGlobalMemory(&mem, allocator);
 
     const config = core.types.AgentConfig{ .model = "cli-agent" };
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);

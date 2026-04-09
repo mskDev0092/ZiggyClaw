@@ -13,3 +13,4 @@ pub const execute_command = @import("execute_command.zig");
 pub const process = @import("process.zig");
 pub const sessions = @import("sessions.zig");
 pub const secrets = @import("secrets.zig");
+pub const memory = @import("memory.zig");
