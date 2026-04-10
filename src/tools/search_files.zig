@@ -1,9 +1,19 @@
 const std = @import("std");
 const core = @import("core");
 
+fn toLower(input: []const u8, allocator: std.mem.Allocator) []const u8 {
+    var result = allocator.alloc(u8, input.len) catch return input;
+    for (input, 0..) |c, i| {
+        if (c >= 'A' and c <= 'Z') {
+            result[i] = c + 32;
+        } else {
+            result[i] = c;
+        }
+    }
+    return result;
+}
+
 fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult {
-    _ = ctx;
-    // Format: "search_term\n---\n<optional_path>"
     const sep = "\n---\n";
     const sep_idx = std.mem.indexOf(u8, args, sep);
 
@@ -25,12 +35,15 @@ fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult 
         return .{ .success = false, .data = "", .error_msg = "Invalid path: path traversal not allowed" };
     }
 
+    const search_term_lower = toLower(search_term, ctx.allocator);
+    defer ctx.allocator.free(search_term_lower);
+
     var dir = std.fs.cwd().openDir(if (search_path.len == 0) "." else search_path, .{}) catch |err| {
         return .{ .success = false, .data = "", .error_msg = @errorName(err) };
     };
     defer dir.close();
 
-    var buf: [16384]u8 = undefined;
+    var buf: [32768]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&buf);
     const alloc = fba.allocator();
 
@@ -50,7 +63,10 @@ fn execute(ctx: core.types.ToolContext, args: []const u8) core.types.ToolResult 
 
         const content = file.readToEndAlloc(alloc, 32768) catch continue;
 
-        if (std.mem.indexOf(u8, content, search_term)) |_| {
+        const content_lower = toLower(content, alloc);
+        defer alloc.free(content_lower);
+
+        if (std.mem.indexOf(u8, content_lower, search_term_lower)) |_| {
             results.appendSlice(entry.path) catch break;
             results.append('\n') catch break;
             count += 1;

@@ -32,29 +32,33 @@ fn containsDangerousPatterns(params: []const u8) bool {
 }
 
 fn parseTimeout(params: []const u8) usize {
-    const timeout_idx = std.mem.indexOf(u8, params, "--timeout ") orelse return 30;
-    const timeout_str = params[timeout_idx + 11 ..];
-    const end = std.mem.indexOf(u8, timeout_str, " ") orelse timeout_str.len;
-    return std.fmt.parseInt(usize, timeout_str[0..end], 10) catch 30;
+    const timeout_idx = std.mem.indexOf(u8, params, "\"timeout\":") orelse return 30;
+    var cursor = timeout_idx + 10;
+    while (cursor < params.len and (params[cursor] == ' ' or params[cursor] == '\t')) cursor += 1;
+    var end = cursor;
+    while (end < params.len and params[end] >= '0' and params[end] <= '9') end += 1;
+    if (end > cursor) {
+        return std.fmt.parseInt(usize, params[cursor..end], 10) catch 30;
+    }
+    return 30;
+}
+
+fn parseArgs(params: []const u8) ?[]const u8 {
+    const cmd_start = std.mem.indexOf(u8, params, "\"cmd\":") orelse return null;
+    var cursor = cmd_start + 6;
+    while (cursor < params.len and (params[cursor] == ' ' or params[cursor] == '\t')) cursor += 1;
+    if (cursor >= params.len or params[cursor] != '"') return null;
+    cursor += 1;
+    const value_start = cursor;
+    while (cursor < params.len and params[cursor] != '"') cursor += 1;
+    if (cursor >= params.len) return null;
+    return params[value_start..cursor];
 }
 
 fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResult {
-    const clean_params = if (std.mem.indexOf(u8, params, "--timeout ") != null) blk: {
-        var result = std.ArrayList(u8).init(ctx.allocator);
-        var i: usize = 0;
-        while (i < params.len) {
-            if (std.mem.startsWith(u8, params[i..], "--timeout ")) {
-                const next_space = std.mem.indexOf(u8, params[i..], " ") orelse params.len;
-                i += next_space;
-                while (i < params.len and params[i] == ' ') i += 1;
-                while (i < params.len and params[i] != ' ') i += 1;
-                continue;
-            }
-            result.append(params[i]) catch {};
-            i += 1;
-        }
-        break :blk result.items;
-    } else params;
+    const clean_params = parseArgs(params) orelse {
+        return .{ .success = false, .data = "", .error_msg = "Invalid arguments: expected {\"cmd\":\"...\"}" };
+    };
 
     if (!isCommandAllowed(clean_params)) {
         return .{ .success = false, .data = "", .error_msg = "Command not allowed" };
@@ -77,7 +81,7 @@ fn execute(ctx: core.types.ToolContext, params: []const u8) core.types.ToolResul
 pub fn getTool() registry.ToolRegistry.Tool {
     return .{
         .name = "execute_command",
-        .description = "Run shell commands with timeout. Usage: execute_command <cmd> [--timeout seconds]. Allowed: ls, echo, pwd, cat, wc, grep, find, head, tail, sort, etc. Max 60s timeout.",
+        .description = "Run shell commands with timeout. Usage: execute_command {\"cmd\":\"<command>\", \"timeout\":30}. Allowed: ls, echo, pwd, cat, wc, grep, find, head, tail, sort, etc. Max 60s timeout.",
         .execute = execute,
     };
 }

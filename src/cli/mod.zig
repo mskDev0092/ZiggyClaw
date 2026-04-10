@@ -245,7 +245,7 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     tools.memory.setGlobalMemory(&mem, allocator);
 
     const config = core.types.AgentConfig{
-        .model = "cli-agent",
+        .model = "nvidia/nemotron-3-nano-4b",
     };
 
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
@@ -300,7 +300,7 @@ fn runPair(allocator: std.mem.Allocator) !void {
     var mem = memory_mod.Memory.init(allocator);
     tools.memory.setGlobalMemory(&mem, allocator);
 
-    const config = core.types.AgentConfig{ .model = "cli-agent" };
+    const config = core.types.AgentConfig{ .model = "nvidia/nemotron-3-nano-4b" };
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
 
     var buffer: [4096]u8 = undefined;

@@ -50,4 +50,26 @@ pub fn build(b: *std.Build) void {
 
     const run_step = b.step("run", "Run ZiggyClaw");
     run_step.dependOn(&run_cmd.step);
+
+    // Add test step
+    const test_step = b.step("test", "Run all tests");
+    const test_all = b.addTest(.{
+        .name = "test_all",
+        .root_source_file = b.path("src/test_all.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    test_all.root_module.addImport("core", core);
+    test_all.root_module.addImport("tools", tools);
+    test_all.root_module.addImport("security", security);
+    test_all.root_module.addImport("config", config);
+    test_all.root_module.addImport("memory", memory);
+    test_all.root_module.addImport("channels", channels);
+    test_all.root_module.addImport("canvas", canvas);
+    test_all.root_module.addImport("plugins", plugins);
+    test_all.root_module.addImport("cli", cli);
+    test_all.root_module.addImport("utils", utils);
+
+    const test_run = b.addRunArtifact(test_all);
+    test_step.dependOn(&test_run.step);
 }

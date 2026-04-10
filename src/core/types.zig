@@ -87,6 +87,11 @@ pub const Skill = struct {
     pub fn deinit(self: *Skill) void {
         self.tools.deinit();
     }
+
+    pub fn deinitWithAllocator(self: *Skill, allocator: std.mem.Allocator) void {
+        _ = allocator;
+        self.tools.deinit();
+    }
 };
 
 pub const SkillRegistry = struct {
@@ -103,7 +108,7 @@ pub const SkillRegistry = struct {
     pub fn deinit(self: *SkillRegistry) void {
         var iter = self.skills.valueIterator();
         while (iter.next()) |skill| {
-            skill.deinit(self.allocator);
+            skill.deinit();
         }
         self.skills.deinit();
     }

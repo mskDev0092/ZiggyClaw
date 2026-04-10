@@ -100,4 +100,22 @@ A historical record of completed features and milestones.
 
 ---
 
-*Last Updated: 2026-04-04*
+## Critical Bug Fixes (2026-04-10)
+
+- [x] Fixed `build.zig.zon` name from `.ziggyclaws` to `.ziggyclaw` with proper fingerprint
+- [x] Fixed `SkillRegistry.deinit()` signature mismatch (was passing allocator to Skill.deinit which takes 0 args)
+- [x] Fixed memory leak in `config/mod.zig` `loadFromEnv()` - wasn't freeing old values before replacing
+- [x] Fixed memory leak in `config/mod.zig` `save()` - intermediate allocPrint strings were leaked (now deferred free)
+- [x] Fixed memory leak in `memory/mod.zig` `put()` - wasn't freeing old value on key update
+- [x] Fixed `max_iterations` hardcoded to 10 in agent.zig - now uses config value `self.config.max_iterations`
+- [x] Fixed test step in `build.zig` - added proper test build step with all module dependencies
+- [x] Fixed test imports in `test_all.zig` - changed to use module imports instead of file paths to avoid duplicate module errors
+- [x] Added SSRF protection to `web_get.zig` - blocks private IP ranges (127.x, 10.x, 192.168.x, 172.16-31.x, 169.254.x, IPv6 loopback/link-local)
+- [x] Added SSRF protection to `web_fetch.zig` - added complete SSRF protection matching web_get (includes 0.0.0.0, ::1, fc00:, fe80:, link-local)
+- [x] Fixed `file_read.zig` symlink vulnerability - added `resolveAndCheckSymlink()` to resolve symlinks and verify they stay within workspace
+- [x] Fixed `search_files.zig` case-sensitivity - added `toLower()` function to perform case-insensitive search
+- [x] Fixed agent creating new LLMClient every iteration - now creates once and reuses, reducing allocations
+
+---
+
+*Last Updated: 2026-04-10*

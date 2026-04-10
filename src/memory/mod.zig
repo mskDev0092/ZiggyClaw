@@ -36,9 +36,9 @@ pub const Memory = struct {
         while (i < self.entries.items.len) : (i += 1) {
             const e = self.entries.items[i];
             if (std.mem.eql(u8, e.key, key)) {
-                var updated = e;
-                updated.value = value;
-                self.entries.items[i] = updated;
+                // Free old value before updating
+                self.allocator.free(self.entries.items[i].value);
+                self.entries.items[i].value = value;
                 return;
             }
         }

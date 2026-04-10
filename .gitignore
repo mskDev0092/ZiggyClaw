@@ -10,7 +10,7 @@ zig-out/
 *.swp
 *.swo
 *~
-
+ZiggyClaw_Complete_Instructions.md
 # OS
 .DS_Store
 Thumbs.db

@@ -4,7 +4,7 @@ const tools = @import("tools");
 const session_mod = @import("session.zig");
 const core_llm = @import("llm.zig");
 
-const DEFAULT_SYSTEM_PROMPT = "You are an AI assistant. Use tools when user asks to do tasks.";
+const DEFAULT_SYSTEM_PROMPT = "You are an autonomous agent. When user asks to do something (read file, list files, run commands, search, etc), use the available tools to complete the task. Think step by step. Keep using tools until the task is complete. Always respond with actual content, not empty.";
 
 pub const Agent = struct {
     config: types.AgentConfig,
@@ -35,7 +35,7 @@ pub const Agent = struct {
         const sess = try self.session_manager.getOrCreate(session_id);
         try sess.addMessage("user", user_message);
 
-        const max_iterations = 10;
+        const max_iterations = self.config.max_iterations;
         var iteration: usize = 0;
 
         var use_llm = false;
@@ -62,19 +62,18 @@ pub const Agent = struct {
                 return try self.thinkSimple(session_id, sess);
             }
 
-            const llm = core_llm.LLMClient.init(
+            var llm = core_llm.LLMClient.init(
                 self.allocator,
                 api_key,
                 self.config.model,
                 api_base,
             );
-            var llm_with_system = llm;
-            llm_with_system.system_prompt = self.config.system_prompt orelse DEFAULT_SYSTEM_PROMPT;
+            llm.system_prompt = self.config.system_prompt orelse DEFAULT_SYSTEM_PROMPT;
 
-            const tool_defs = try llm_with_system.buildToolDefinitions(self.tool_registry);
+            const tool_defs = try llm.buildToolDefinitions(self.tool_registry);
             defer self.allocator.free(tool_defs);
 
-            const llm_response = try llm_with_system.callLLM(sess.messages, tool_defs);
+            const llm_response = try llm.callLLM(sess.messages, tool_defs);
             std.debug.print("[Agent] Response - content: '{s}', reasoning: '{s}', tool_calls: {d}, stop_reason: '{s}'\n", .{ llm_response.content, llm_response.reasoning_content orelse "", llm_response.tool_calls.items.len, llm_response.stop_reason });
             defer {
                 self.allocator.free(llm_response.content);
@@ -87,14 +86,18 @@ pub const Agent = struct {
                 try sess.addMessage("assistant", llm_response.content);
             }
 
-            // If no tool calls, return content/reasoning
+            // If no tool calls, check for meaningful content - otherwise continue looping
+            const is_empty = std.mem.trim(u8, llm_response.content, " \n\r\t").len == 0;
+            const has_reasoning = llm_response.reasoning_content != null and std.mem.trim(u8, llm_response.reasoning_content.?, " \n\r\t").len > 0;
+
             if (llm_response.tool_calls.items.len == 0) {
-                if (llm_response.content.len > 0) {
+                if (!is_empty) {
                     return try self.allocator.dupe(u8, llm_response.content);
-                } else if (llm_response.reasoning_content) |reasoning| {
-                    return try self.allocator.dupe(u8, reasoning);
+                } else if (has_reasoning) {
+                    return try self.allocator.dupe(u8, llm_response.reasoning_content.?);
                 } else {
-                    return try self.allocator.dupe(u8, "Agent completed reasoning");
+                    // Empty response - continue looping to get meaningful result
+                    continue;
                 }
             }
 
@@ -114,18 +117,7 @@ pub const Agent = struct {
                 }
             }
 
-            if (std.mem.eql(u8, llm_response.stop_reason, "end_turn") or
-                std.mem.eql(u8, llm_response.stop_reason, "stop") or
-                llm_response.tool_calls.items.len == 0)
-            {
-                if (llm_response.content.len > 0) {
-                    return try self.allocator.dupe(u8, llm_response.content);
-                } else if (llm_response.reasoning_content) |reasoning| {
-                    return try self.allocator.dupe(u8, reasoning);
-                } else {
-                    return try self.allocator.dupe(u8, "Agent completed");
-                }
-            }
+            // After tool execution, loop continues to get final response
         }
 
         return try self.allocator.dupe(u8, "Agent reached maximum iterations");

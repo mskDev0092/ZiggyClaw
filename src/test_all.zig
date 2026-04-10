@@ -1,6 +1,7 @@
 const std = @import("std");
-const llm = @import("core/llm.zig");
-const memory_mod = @import("memory/mod.zig");
+const core = @import("core");
+const llm = core.llm;
+const memory_mod = @import("memory");
 
 // ZiggyClaw Test Runner
 // Run with: zig run scripts/test_all.zig

@@ -88,7 +88,17 @@ pub const LLMClient = struct {
             try tools_json.appendSlice("{\"type\":\"function\",\"function\":{\"name\":\"");
             try tools_json.appendSlice(tool.name);
             try tools_json.appendSlice("\",\"description\":\"");
-            try tools_json.appendSlice(tool.description);
+            // Escape the description for valid JSON
+            for (tool.description) |c| {
+                switch (c) {
+                    '"' => try tools_json.appendSlice("\\\""),
+                    '\\' => try tools_json.appendSlice("\\\\"),
+                    '\n' => try tools_json.appendSlice("\\n"),
+                    '\r' => try tools_json.appendSlice("\\r"),
+                    '\t' => try tools_json.appendSlice("\\t"),
+                    else => try tools_json.append(c),
+                }
+            }
             try tools_json.appendSlice("\"}}");
         }
 
@@ -121,6 +131,7 @@ pub const LLMClient = struct {
         var json = std.ArrayList(u8).init(self.allocator);
         errdefer json.deinit();
 
+        var first_message = true;
         try json.appendSlice("[");
 
         // Add system message first if provided
@@ -130,10 +141,12 @@ pub const LLMClient = struct {
             defer self.allocator.free(escaped);
             try json.appendSlice(escaped);
             try json.appendSlice("\"}");
+            first_message = false;
         }
 
         for (messages.items) |msg| {
-            if (system_prompt != null or json.items.len > 1) try json.appendSlice(",");
+            if (!first_message) try json.appendSlice(",");
+            first_message = false;
             const escaped_content = try self.escapeJsonString(msg.content);
             defer self.allocator.free(escaped_content);
             try json.appendSlice("{\"role\":\"");
@@ -151,28 +164,37 @@ pub const LLMClient = struct {
         defer client.deinit();
 
         var header_buf: [4096]u8 = undefined;
-        var extra_headers = [_]std.http.Header{
-            .{ .name = "Content-Type", .value = "application/json" },
-        };
+
+        // Build headers
+        var headers = std.ArrayList(std.http.Header).init(self.allocator);
+        defer headers.deinit();
+        try headers.append(.{ .name = "Content-Type", .value = "application/json" });
+        try headers.append(.{ .name = "Accept", .value = "application/json" });
 
         var auth_header_buf: [256]u8 = undefined;
-        var auth_header: ?std.http.Header = null;
         if (self.api_key.len > 0) {
             const auth = try std.fmt.bufPrint(&auth_header_buf, "Bearer {s}", .{self.api_key});
-            auth_header = .{ .name = "Authorization", .value = auth };
+            try headers.append(.{ .name = "Authorization", .value = auth });
         }
 
         var req = try client.open(.POST, try std.Uri.parse(url), .{
             .server_header_buffer = &header_buf,
-            .extra_headers = if (auth_header) |h| &[_]std.http.Header{ extra_headers[0], h } else &extra_headers,
+            .extra_headers = headers.items,
         });
         defer req.deinit();
+
+        std.debug.print("[LLM] HTTP request: POST {s}, body len={d}\n", .{ url, body.len });
 
         req.transfer_encoding = .{ .content_length = body.len };
         try req.send();
         try req.writeAll(body);
         try req.finish();
+
+        // Wait for response FIRST, then read body
         try req.wait();
+
+        const status = req.response.status;
+        std.debug.print("[LLM] HTTP response status: {}\n", .{status});
 
         const response_body = try req.reader().readAllAlloc(self.allocator, 1024 * 1024);
         return response_body;
@@ -202,9 +224,10 @@ pub const LLMClient = struct {
         try body.appendSlice("}");
 
         std.debug.print("[LLM] Sending request to {s}\n", .{self.api_base});
-        std.debug.print("[LLM] Request body: {s}\n", .{body.items});
+        std.debug.print("[LLM] Full request body: {s}\n", .{body.items});
 
         var base_url = self.api_base;
+        // Strip trailing /v1 or /api if present - we'll add the endpoint ourselves
         if (std.mem.endsWith(u8, base_url, "/v1")) {
             base_url = base_url[0..(base_url.len - 3)];
         } else if (std.mem.endsWith(u8, base_url, "/api")) {
@@ -221,8 +244,13 @@ pub const LLMClient = struct {
             .xai => "/v1/chat/completions",
         };
 
-        const full_url = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ base_url, endpoint });
+        // Special handling: if base_url already ends with /v1 and endpoint starts with /v1, don't double-add
+        const full_url = if (std.mem.endsWith(u8, base_url, "/v1") and std.mem.startsWith(u8, endpoint, "/v1"))
+            try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ base_url, endpoint[3..] })
+        else
+            try std.fmt.allocPrint(self.allocator, "{s}{s}", .{ base_url, endpoint });
         defer self.allocator.free(full_url);
+        std.debug.print("[LLM] Full URL: {s}\n", .{full_url});
 
         const response_text = try self.httpRequest(full_url, body.items);
         defer self.allocator.free(response_text);
@@ -246,77 +274,131 @@ pub const LLMClient = struct {
         stop_reason = try self.allocator.dupe(u8, "stop");
         errdefer self.allocator.free(stop_reason);
 
-        // Parse OpenAI/lm-studio format: look for "content":"..." in choices[0].message
-        if (std.mem.indexOf(u8, response, "\"content\":")) |content_start_idx| {
-            const content_start = content_start_idx + 11; // length of "\"content\":\""
-            if (content_start < response.len and response[content_start] == '"') {
-                var content_end = content_start + 1;
-                while (content_end < response.len and response[content_end] != '"') : (content_end += 1) {
-                    if (response[content_end] == '\\' and content_end + 1 < response.len) {
-                        content_end += 1;
+        // First check for error response
+        if (std.mem.indexOf(u8, response, "\"error\"") != null) {
+            std.debug.print("[LLM] Error in response: {s}\n", .{response});
+            return .{
+                .content = content,
+                .tool_calls = tool_calls,
+                .stop_reason = stop_reason,
+                .reasoning_content = null,
+            };
+        }
+
+        // Parse content from message object within choices
+        // Find choices array and parse the first message's content
+        if (std.mem.indexOf(u8, response, "\"choices\":")) |choices_start| {
+            const after_choices = response[choices_start + 9 ..];
+            if (std.mem.indexOf(u8, after_choices, "\"message\":{")) |msg_start| {
+                const after_msg = after_choices[msg_start + 9 ..];
+                const content_pat = "\"content\":";
+                if (std.mem.indexOf(u8, after_msg, content_pat)) |pos| {
+                    const content_start = pos + content_pat.len;
+                    var cursor = content_start;
+                    while (cursor < after_msg.len and (after_msg[cursor] == ' ' or after_msg[cursor] == '\t')) cursor += 1;
+                    if (cursor < after_msg.len and after_msg[cursor] == '"') cursor += 1;
+                    const value_start = cursor;
+                    var value_end = cursor;
+                    while (value_end < after_msg.len and after_msg[value_end] != '"') value_end += 1;
+                    if (value_end < after_msg.len) {
+                        const parsed = after_msg[value_start..value_end];
+                        if (parsed.len > 0 and std.mem.trim(u8, parsed, " \n\r\t").len > 0) {
+                            self.allocator.free(content);
+                            content = try self.allocator.dupe(u8, parsed);
+                        }
                     }
-                }
-                if (content_end < response.len) {
-                    self.allocator.free(content); // Free the default empty string
-                    content = try self.allocator.dupe(u8, response[content_start + 1 .. content_end]);
                 }
             }
         }
 
-        // Parse tool_calls - with flexible whitespace handling
-        if (std.mem.indexOf(u8, response, "\"function\":") != null and std.mem.indexOf(u8, response, "\"name\":") != null) {
-            var idx: usize = 0;
-            while (idx < response.len) {
-                const func_start = std.mem.indexOf(u8, response[idx..], "\"name\":\"");
-                if (func_start == null) break;
-                const name_start = idx + func_start.? + 8;
-                var name_end = name_start;
-                while (name_end < response.len and response[name_end] != '"') name_end += 1;
-                const tool_name = response[name_start..name_end];
+        // Parse tool_calls - find them within the message in choices
+        if (std.mem.indexOf(u8, response, "\"tool_calls\":")) |tool_calls_start| {
+            const after_tool_calls = response[tool_calls_start + 12 ..];
+            var search_idx: usize = 0;
+            var found: usize = 0;
+            while (search_idx < after_tool_calls.len and found < 5) {
+                const name_pat = "\"name\":";
+                if (std.mem.indexOf(u8, after_tool_calls[search_idx..], name_pat)) |pos| {
+                    const name_start = search_idx + pos + name_pat.len;
+                    var name_cursor = name_start;
+                    while (name_cursor < after_tool_calls.len and (after_tool_calls[name_cursor] == ' ' or after_tool_calls[name_cursor] == '\t')) name_cursor += 1;
+                    if (name_cursor < after_tool_calls.len and after_tool_calls[name_cursor] == '"') name_cursor += 1;
+                    const name_value_start = name_cursor;
+                    var name_end = name_cursor;
+                    while (name_end < after_tool_calls.len and after_tool_calls[name_end] != '"') name_end += 1;
+                    const tool_name = after_tool_calls[name_value_start..name_end];
 
-                const after_name = response[name_end..];
-                const args_start_pos = std.mem.indexOf(u8, after_name, "\"arguments\":");
-                if (args_start_pos == null) break;
-                const args_start = name_end + 2 + args_start_pos.? + 13;
-                var args_end = args_start;
-                while (args_end < response.len and response[args_end] != '"') args_end += 1;
-                const tool_args = response[args_start..args_end];
+                    const remaining = after_tool_calls[name_end..];
+                    const args_pat = "\"arguments\":";
+                    if (std.mem.indexOf(u8, remaining, args_pat)) |apos| {
+                        const args_cursor = name_end + 2 + apos + args_pat.len;
+                        var args_start = args_cursor;
+                        while (args_start < after_tool_calls.len and (after_tool_calls[args_start] == ' ' or after_tool_calls[args_start] == '\t')) args_start += 1;
+                        if (args_start < after_tool_calls.len and after_tool_calls[args_start] == '"') args_start += 1;
+                        var args_end = args_start;
+                        while (args_end < after_tool_calls.len and after_tool_calls[args_end] != '"') args_end += 1;
+                        const tool_args = after_tool_calls[args_start..args_end];
 
-                try tool_calls.append(.{
-                    .id = try std.fmt.allocPrint(self.allocator, "call_{d}", .{tool_calls.items.len}),
-                    .name = try self.allocator.dupe(u8, tool_name),
-                    .arguments = try self.allocator.dupe(u8, tool_args),
-                });
-
-                idx = args_end + 1;
+                        if (tool_name.len > 0 and tool_args.len > 0) {
+                            try tool_calls.append(.{
+                                .id = try std.fmt.allocPrint(self.allocator, "call_{d}", .{found}),
+                                .name = try self.allocator.dupe(u8, tool_name),
+                                .arguments = try self.allocator.dupe(u8, tool_args),
+                            });
+                            found += 1;
+                        }
+                    }
+                    search_idx = name_end + 1;
+                } else {
+                    break;
+                }
             }
-            std.debug.print("[LLM] Total tool calls: {d}\n", .{tool_calls.items.len});
         }
 
         // Try to extract finish_reason
-        const finish_pos = std.mem.indexOf(u8, response, "\"finish_reason\":\"");
-        if (finish_pos != null) {
-            const reason_start = finish_pos.? + 15;
-            if (reason_start < response.len and response[reason_start] == '"') {
-                var reason_end = reason_start + 1;
+        var finish_search_idx: usize = 0;
+        while (finish_search_idx < response.len) {
+            const finish_pat = "\"finish_reason\":";
+            if (std.mem.indexOf(u8, response[finish_search_idx..], finish_pat)) |pos| {
+                const reason_start = finish_search_idx + pos + finish_pat.len;
+                var reason_cursor = reason_start;
+                while (reason_cursor < response.len and (response[reason_cursor] == ' ' or response[reason_cursor] == '\t')) reason_cursor += 1;
+                if (reason_cursor < response.len and response[reason_cursor] == '"') reason_cursor += 1;
+                var reason_end = reason_cursor;
                 while (reason_end < response.len and response[reason_end] != '"') : (reason_end += 1) {}
                 if (reason_end < response.len) {
                     self.allocator.free(stop_reason);
-                    stop_reason = try self.allocator.dupe(u8, response[reason_start + 1 .. reason_end]);
+                    stop_reason = try self.allocator.dupe(u8, response[reason_cursor..reason_end]);
+                    break;
                 }
+                finish_search_idx = reason_end + 1;
+            } else {
+                break;
             }
         }
 
         // Parse reasoning_content if present
-        const reason_pos = std.mem.indexOf(u8, response, "\"reasoning_content\":\"");
-        if (reason_pos != null) {
-            const rstart = reason_pos.? + 20;
-            if (rstart < response.len and response[rstart] == '"') {
-                var rend = rstart + 1;
+        var reason_search_idx: usize = 0;
+        while (reason_search_idx < response.len) {
+            const reason_pat = "\"reasoning_content\":";
+            if (std.mem.indexOf(u8, response[reason_search_idx..], reason_pat)) |pos| {
+                const rstart = reason_search_idx + pos + reason_pat.len;
+                var r_cursor = rstart;
+                while (r_cursor < response.len and (response[r_cursor] == ' ' or response[r_cursor] == '\t')) r_cursor += 1;
+                if (r_cursor < response.len and response[r_cursor] == '"') r_cursor += 1;
+                var rend = r_cursor;
                 while (rend < response.len and response[rend] != '"') : (rend += 1) {}
                 if (rend < response.len) {
-                    reasoning_content = try self.allocator.dupe(u8, response[rstart + 1 .. rend]);
+                    const parsed_reasoning = response[r_cursor..rend];
+                    // Only use if non-empty (trimming whitespace)
+                    if (parsed_reasoning.len > 0 and std.mem.trim(u8, parsed_reasoning, " \n\r\t").len > 0) {
+                        reasoning_content = try self.allocator.dupe(u8, parsed_reasoning);
+                        break;
+                    }
                 }
+                reason_search_idx = rend + 1;
+            } else {
+                break;
             }
         }
 

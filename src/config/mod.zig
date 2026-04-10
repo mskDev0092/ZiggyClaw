@@ -131,9 +131,11 @@ pub fn loadFromEnv(allocator: std.mem.Allocator, config: *Config) !void {
         config.gateway.host = try allocator.dupe(u8, h);
     }
     if (env_map.get("OPENAI_API_BASE")) |b| {
+        allocator.free(config.agent.api_base);
         config.agent.api_base = try allocator.dupe(u8, b);
     }
     if (env_map.get("OPENAI_API_KEY")) |k| {
+        allocator.free(config.agent.api_key);
         config.agent.api_key = try allocator.dupe(u8, k);
     }
     if (env_map.get("AGENT_MODEL")) |m| {
@@ -200,28 +202,70 @@ pub fn save(config: Config, allocator: std.mem.Allocator, path: []const u8) !voi
 
     try json.appendSlice("{\n");
     try json.appendSlice("  \"gateway\": {\n");
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"port\": {d},\n", .{config.gateway.port}));
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"host\": \"{s}\",\n", .{config.gateway.host}));
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"workers\": {d},\n", .{config.gateway.workers}));
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"timeout\": {d}\n", .{config.gateway.timeout_seconds}));
+    {
+        const port_line = try std.fmt.allocPrint(allocator, "    \"port\": {d},\n", .{config.gateway.port});
+        defer allocator.free(port_line);
+        try json.appendSlice(port_line);
+    }
+    {
+        const host_line = try std.fmt.allocPrint(allocator, "    \"host\": \"{s}\",\n", .{config.gateway.host});
+        defer allocator.free(host_line);
+        try json.appendSlice(host_line);
+    }
+    {
+        const workers_line = try std.fmt.allocPrint(allocator, "    \"workers\": {d},\n", .{config.gateway.workers});
+        defer allocator.free(workers_line);
+        try json.appendSlice(workers_line);
+    }
+    {
+        const timeout_line = try std.fmt.allocPrint(allocator, "    \"timeout\": {d}\n", .{config.gateway.timeout_seconds});
+        defer allocator.free(timeout_line);
+        try json.appendSlice(timeout_line);
+    }
     try json.appendSlice("  },\n");
     try json.appendSlice("  \"agent\": {\n");
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"model\": \"{s}\",\n", .{config.agent.model}));
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"max_iterations\": {d},\n", .{config.agent.max_iterations}));
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"temperature\": {d:.2}\n", .{config.agent.temperature}));
+    {
+        const model_line = try std.fmt.allocPrint(allocator, "    \"model\": \"{s}\",\n", .{config.agent.model});
+        defer allocator.free(model_line);
+        try json.appendSlice(model_line);
+    }
+    {
+        const iter_line = try std.fmt.allocPrint(allocator, "    \"max_iterations\": {d},\n", .{config.agent.max_iterations});
+        defer allocator.free(iter_line);
+        try json.appendSlice(iter_line);
+    }
+    {
+        const temp_line = try std.fmt.allocPrint(allocator, "    \"temperature\": {d:.2}\n", .{config.agent.temperature});
+        defer allocator.free(temp_line);
+        try json.appendSlice(temp_line);
+    }
     try json.appendSlice("  },\n");
     try json.appendSlice("  \"tools\": {\n");
     try json.appendSlice("    \"shell_whitelist\": [");
     for (config.tools.shell_whitelist, 0..) |cmd, i| {
         if (i > 0) try json.appendSlice(", ");
-        try json.appendSlice(try std.fmt.allocPrint(allocator, "\"{s}\"", .{cmd}));
+        const cmd_line = try std.fmt.allocPrint(allocator, "\"{s}\"", .{cmd});
+        defer allocator.free(cmd_line);
+        try json.appendSlice(cmd_line);
     }
     try json.appendSlice("],\n");
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"max_file_size\": {d}\n", .{config.tools.max_file_size}));
+    {
+        const size_line = try std.fmt.allocPrint(allocator, "    \"max_file_size\": {d}\n", .{config.tools.max_file_size});
+        defer allocator.free(size_line);
+        try json.appendSlice(size_line);
+    }
     try json.appendSlice("  },\n");
     try json.appendSlice("  \"logging\": {\n");
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"level\": \"{s}\",\n", .{config.logging.level}));
-    try json.appendSlice(try std.fmt.allocPrint(allocator, "    \"format\": \"{s}\"\n", .{config.logging.format}));
+    {
+        const level_line = try std.fmt.allocPrint(allocator, "    \"level\": \"{s}\",\n", .{config.logging.level});
+        defer allocator.free(level_line);
+        try json.appendSlice(level_line);
+    }
+    {
+        const format_line = try std.fmt.allocPrint(allocator, "    \"format\": \"{s}\"\n", .{config.logging.format});
+        defer allocator.free(format_line);
+        try json.appendSlice(format_line);
+    }
     try json.appendSlice("  }\n");
     try json.appendSlice("}\n");
 
