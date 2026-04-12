@@ -109,6 +109,8 @@ pub const Skill = struct {
     description: []const u8,
     prompt: []const u8,
     tools: std.ArrayList([]const u8),
+    dependencies: std.ArrayList([]const u8),
+    enabled: bool = true,
 
     pub fn init(allocator: std.mem.Allocator, name: []const u8, description: []const u8, prompt: []const u8) Skill {
         return .{
@@ -116,16 +118,20 @@ pub const Skill = struct {
             .description = description,
             .prompt = prompt,
             .tools = std.ArrayList([]const u8).init(allocator),
+            .dependencies = std.ArrayList([]const u8).init(allocator),
+            .enabled = true,
         };
     }
 
-    pub fn deinit(self: *Skill) void {
+    pub fn deinit(self: *Skill, allocator: std.mem.Allocator) void {
+        for (self.tools.items) |t| allocator.free(t);
         self.tools.deinit();
+        for (self.dependencies.items) |d| allocator.free(d);
+        self.dependencies.deinit();
     }
 
-    pub fn deinitWithAllocator(self: *Skill, allocator: std.mem.Allocator) void {
-        _ = allocator;
-        self.tools.deinit();
+    pub fn addDependency(self: *Skill, dep: []const u8) !void {
+        try self.dependencies.append(dep);
     }
 };
 
@@ -143,7 +149,7 @@ pub const SkillRegistry = struct {
     pub fn deinit(self: *SkillRegistry) void {
         var iter = self.skills.valueIterator();
         while (iter.next()) |skill| {
-            skill.deinit();
+            skill.deinit(self.allocator);
         }
         self.skills.deinit();
     }

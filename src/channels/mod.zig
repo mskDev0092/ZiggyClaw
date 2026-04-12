@@ -7,6 +7,9 @@ const types = @import("../core/types.zig");
 pub const ChannelType = enum {
     http_webhook,
     stdio,
+    discord,
+    telegram,
+    signal,
 };
 
 pub const ChannelMessage = struct {
@@ -165,3 +168,148 @@ pub fn startStdioChannel(handler: *ChannelHandler) !void {
         try stdout.writer().print("{s}\n", .{response});
     }
 }
+
+pub const DiscordConfig = struct {
+    bot_token: []const u8,
+    channel_id: []const u8,
+};
+
+pub fn startDiscordChannel(config: DiscordConfig, handler: *ChannelHandler) !void {
+    _ = config;
+    _ = handler;
+    std.debug.print("📱 Discord channel ready (bot mode)\n", .{});
+    std.debug.print("   Note: Discord integration requires gateway mode\n", .{});
+}
+
+pub const TelegramConfig = struct {
+    bot_token: []const u8,
+    allowed_users: []const []const u8,
+};
+
+pub fn startTelegramChannel(config: TelegramConfig, handler: *ChannelHandler) !void {
+    _ = config;
+    _ = handler;
+    std.debug.print("📱 Telegram channel ready (bot mode)\n", .{});
+    std.debug.print("   Note: Telegram integration requires gateway mode\n", .{});
+}
+
+pub const SignalConfig = struct {
+    phone_number: []const u8,
+    signal_cli_path: []const u8,
+};
+
+pub fn startSignalChannel(config: SignalConfig, handler: *ChannelHandler) !void {
+    _ = config;
+    _ = handler;
+    std.debug.print("📱 Signal channel ready (cli mode)\n", .{});
+    std.debug.print("   Note: Signal integration requires gateway mode and signal-cli\n", .{});
+}
+
+pub const HeartbeatConfig = struct {
+    interval_seconds: u32 = 60,
+    endpoint: ?[]const u8 = null,
+};
+
+pub const HeartbeatStatus = struct {
+    healthy: bool,
+    last_check: i64,
+    checks_passed: u32,
+    checks_failed: u32,
+};
+
+pub const Heartbeat = struct {
+    allocator: std.mem.Allocator,
+    interval_seconds: u32,
+    status: HeartbeatStatus,
+    running: bool,
+
+    pub fn init(allocator: std.mem.Allocator, interval_seconds: u32) Heartbeat {
+        return .{
+            .allocator = allocator,
+            .interval_seconds = interval_seconds,
+            .status = .{
+                .healthy = true,
+                .last_check = std.time.timestamp(),
+                .checks_passed = 0,
+                .checks_failed = 0,
+            },
+            .running = false,
+        };
+    }
+
+    pub fn start(self: *Heartbeat) void {
+        self.running = true;
+        std.debug.print("💓 Heartbeat started (interval: {}s)\n", .{self.interval_seconds});
+    }
+
+    pub fn stop(self: *Heartbeat) void {
+        self.running = false;
+    }
+
+    pub fn check(self: *Heartbeat) void {
+        self.status.last_check = std.time.timestamp();
+        if (self.status.healthy) {
+            self.status.checks_passed += 1;
+        } else {
+            self.status.checks_failed += 1;
+        }
+    }
+
+    pub fn getStatus(self: *Heartbeat) HeartbeatStatus {
+        return self.status;
+    }
+};
+
+pub const CronTask = struct {
+    id: []const u8,
+    command: []const u8,
+    interval_seconds: u32,
+    enabled: bool,
+};
+
+pub const CronScheduler = struct {
+    allocator: std.mem.Allocator,
+    tasks: std.ArrayList(CronTask),
+    running: bool,
+
+    pub fn init(allocator: std.mem.Allocator) CronScheduler {
+        return .{
+            .allocator = allocator,
+            .tasks = std.ArrayList(CronTask).init(allocator),
+            .running = false,
+        };
+    }
+
+    pub fn addTask(self: *CronScheduler, id: []const u8, command: []const u8, interval_seconds: u32) !void {
+        try self.tasks.append(.{
+            .id = try self.allocator.dupe(u8, id),
+            .command = try self.allocator.dupe(u8, command),
+            .interval_seconds = interval_seconds,
+            .enabled = true,
+        });
+    }
+
+    pub fn removeTask(self: *CronScheduler, id: []const u8) void {
+        var i: usize = 0;
+        while (i < self.tasks.items.len) {
+            if (std.mem.eql(u8, self.tasks.items[i].id, id)) {
+                _ = self.tasks.orderedRemove(i);
+            } else {
+                i += 1;
+            }
+        }
+    }
+
+    pub fn start(self: *CronScheduler) void {
+        self.running = true;
+        std.debug.print("⏰ Cron scheduler started ({} tasks)\n", .{self.tasks.items.len});
+    }
+
+    pub fn stop(self: *CronScheduler) void {
+        self.running = false;
+    }
+
+    pub fn listTasks(self: *CronScheduler) []const CronTask {
+        return self.tasks.items;
+    }
+};

@@ -28,6 +28,107 @@ pub const Session = struct {
         if (self.summary) |s| self.allocator.free(s);
     }
 
+    pub fn save(self: *Session, dir: std.fs.Dir) !void {
+        var json = std.ArrayList(u8).init(self.allocator);
+        defer json.deinit();
+
+        try json.appendSlice("{\n");
+        try json.appendSlice("  \"id\": \"");
+        try json.appendSlice(self.id);
+        try json.appendSlice("\",\n");
+        try json.appendSlice("  \"token_count\": ");
+        try json.appendSlice(try std.fmt.allocPrint(self.allocator, "{}", .{self.token_count}));
+        try json.appendSlice(",\n");
+        try json.appendSlice("  \"summary\": ");
+        if (self.summary) |s| {
+            try json.appendSlice("\"");
+            for (s) |c| {
+                if (c == '"') try json.appendSlice("\\\"") else try json.append(c);
+            }
+            try json.appendSlice("\"");
+        } else {
+            try json.appendSlice("null");
+        }
+        try json.appendSlice(",\n");
+        try json.appendSlice("  \"messages\": [\n");
+
+        for (self.messages.items, 0..) |msg, i| {
+            if (i > 0) try json.appendSlice(",\n");
+            try json.appendSlice("    {\"role\": \"");
+            for (msg.role) |c| {
+                if (c == '"') try json.appendSlice("\\\"") else try json.append(c);
+            }
+            try json.appendSlice("\", \"content\": \"");
+            for (msg.content) |c| {
+                if (c == '"') try json.appendSlice("\\\"") else try json.append(c);
+            }
+            try json.appendSlice("\"}");
+        }
+        try json.appendSlice("\n  ]\n");
+        try json.appendSlice("}\n");
+
+        try dir.writeFile(self.id, json.items);
+    }
+
+    pub fn load(allocator: std.mem.Allocator, dir: std.fs.Dir, id: []const u8) !Session {
+        const content = try dir.readFileAlloc(allocator, id, 1024 * 64);
+        defer allocator.free(content);
+
+        var session = try Session.init(allocator, id);
+
+        if (std.mem.indexOf(u8, content, "\"messages\":")) |msg_start| {
+            const after_messages = content[msg_start + 10 ..];
+            var role_start: ?usize = null;
+            var content_start: ?usize = null;
+
+            var in_role = false;
+            var in_content = false;
+            var current_field: enum { none, role, content } = .none;
+
+            for (after_messages, 0..) |c, i| {
+                if (c == '"' and current_field == .none) {
+                    const before = after_messages[0..i];
+                    if (std.mem.endsWith(u8, before, "\"role\":")) {
+                        in_role = true;
+                        current_field = .role;
+                    } else if (std.mem.endsWith(u8, before, "\"content\":")) {
+                        in_content = true;
+                        current_field = .content;
+                    }
+                }
+
+                if (in_role and current_field == .role and c == '"') {
+                    if (role_start == null) {
+                        role_start = i + 1;
+                    } else {
+                        const role = after_messages[role_start..i];
+                        const content_start_val = content_start orelse continue;
+                        var content_end_idx = i;
+                        while (content_end_idx > content_start_val and content_end_idx > 0) {
+                            content_end_idx -= 1;
+                            if (after_messages[content_end_idx] == '"') break;
+                        }
+                        const cont = after_messages[content_start_val..content_end_idx];
+                        try session.addMessage(role, cont);
+                        in_role = false;
+                        in_content = false;
+                        current_field = .none;
+                        role_start = null;
+                        content_start = null;
+                    }
+                }
+
+                if (in_content and current_field == .content and c == '"') {
+                    if (content_start == null) {
+                        content_start = i + 1;
+                    }
+                }
+            }
+        }
+
+        return session;
+    }
+
     pub fn addMessage(self: *Session, role: []const u8, content: []const u8) !void {
         const r = try self.allocator.dupe(u8, role);
         const c = try self.allocator.dupe(u8, content);
@@ -125,5 +226,32 @@ pub const SessionManager = struct {
         const new_session = try Session.init(self.allocator, id);
         try self.sessions.put(id, new_session);
         return self.sessions.getPtr(id).?;
+    }
+
+    pub fn saveAll(self: *SessionManager, dir_path: []const u8) !void {
+        const dir = try std.fs.cwd().makeOpenPath(dir_path, .{});
+        defer dir.close();
+
+        var iter = self.sessions.iterator();
+        while (iter.next()) |entry| {
+            try entry.value_ptr.save(dir);
+        }
+    }
+
+    pub fn loadFromDir(self: *SessionManager, dir_path: []const u8) !void {
+        const dir = try std.fs.cwd().openDir(dir_path, .{});
+        defer dir.close();
+
+        var iter = dir.iterate();
+        while (try iter.next()) |entry| {
+            if (entry.kind == .file) {
+                const name = entry.name;
+                if (std.mem.endsWith(u8, name, ".json") or std.mem.indexOf(u8, name, ".") == null) {
+                    const session_name = if (std.mem.indexOf(u8, name, ".")) |dot| name[0..dot] else name;
+                    const session = try Session.load(self.allocator, dir, session_name);
+                    try self.sessions.put(session_name, session);
+                }
+            }
+        }
     }
 };

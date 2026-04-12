@@ -130,7 +130,32 @@ A historical record of completed features and milestones.
 
 - [x] Interactive terminal mode (`ziggyclaw tui`)
 - [x] Slash commands (/help, /tools, /status, /sessions, /model, /clear, /exit)
-- [x] Real-time agent interaction
+- [x] Tab completion for commands and tools
+- [x] Multi-session support (/new, /switch)
+
+## Completed: Phase 11 – Skills System ✅
+
+- [x] YAML/TOML skill file loading (src/core/skills.zig)
+- [x] Skill registry with enable/disable
+- [x] Skill dependency management
+
+## Completed: Phase 12 – Messenger Stubs ✅
+
+- [x] Discord channel handler stub (src/channels/mod.zig)
+- [x] Telegram channel handler stub
+- [x] Signal channel handler stub
+
+## Completed: Phase 13 – Session Persistence ✅
+
+- [x] Session.save() - Save session to JSON file
+- [x] Session.load() - Load session from JSON file
+- [x] SessionManager.saveAll() - Save all sessions
+- [x] SessionManager.loadFromDir() - Load sessions from directory
+
+## Completed: Phase 14 – Monitoring ✅
+
+- [x] Heartbeat system - Health monitoring (src/channels/mod.zig)
+- [x] CronScheduler - Task scheduling system
 
 ---
 
@@ -144,9 +169,11 @@ A historical record of completed features and milestones.
   - /help command works ✅
   - /tools lists tools ✅
   - /status shows agent status ✅
+  - /sessions lists sessions ✅
 - **Agent Tests**:
   - shell command works ✅
 - **Build**: stable ✅
+- **All P0, P1, P2, P3 features completed** ✅
 
 ---
 

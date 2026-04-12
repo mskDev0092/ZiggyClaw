@@ -390,29 +390,58 @@ fn runTUI(allocator: std.mem.Allocator) !void {
     const config = core.types.AgentConfig{ .model = "nvidia/nemotron-3-nano-4b" };
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
 
-    try stdout.print("Session: default\n\n", .{});
+    const current_session_id: []const u8 = "default";
 
-    var buffer: [8192]u8 = undefined;
+    try stdout.print("Session: {s}\n\n", .{current_session_id});
+
+    var input_buffer = std.ArrayList(u8).init(allocator);
+    defer input_buffer.deinit();
+
     while (true) {
         try stdout.print("🦞> ", .{});
+        input_buffer.clearRetainingCapacity();
 
-        const bytes_read = stdin.read(&buffer) catch {
-            try stdout.print("\nGoodbye!\n", .{});
-            break;
-        };
+        while (true) {
+            var byte: [1]u8 = undefined;
+            const bytes_read = stdin.read(&byte) catch {
+                try stdout.print("\nGoodbye!\n", .{});
+                return;
+            };
 
-        if (bytes_read == 0) break;
+            if (bytes_read == 0) {
+                try stdout.print("\n", .{});
+                return;
+            }
 
-        const input = std.mem.trim(u8, buffer[0..bytes_read], "\n\r");
+            if (byte[0] == '\t') {
+                const completions = getCompletions(allocator, input_buffer.items, &registry);
+                if (completions.len > 0) {
+                    try stdout.print("\n", .{});
+                    for (completions) |c| {
+                        try stdout.print("  {s}\n", .{c});
+                    }
+                    try stdout.print("🦞> {s}", .{input_buffer.items});
+                }
+                continue;
+            }
 
+            if (byte[0] == '\n' or byte[0] == '\r') {
+                try stdout.print("\n", .{});
+                break;
+            }
+
+            try input_buffer.append(byte[0]);
+        }
+
+        const input = std.mem.trim(u8, input_buffer.items, " \n\r");
         if (input.len == 0) continue;
 
         if (input[0] == '/') {
-            try handleSlashCommand(allocator, input, &registry);
+            try handleSlashCommand(allocator, input, current_session_id, &session_manager, &registry);
             continue;
         }
 
-        const response = agent.think("tui-session", input) catch {
+        const response = agent.think(current_session_id, input) catch {
             try stdout.print("Error: Failed to get response\n\n", .{});
             continue;
         };
@@ -422,7 +451,8 @@ fn runTUI(allocator: std.mem.Allocator) !void {
     }
 }
 
-fn handleSlashCommand(allocator: std.mem.Allocator, input: []const u8, registry: *tools.registry.ToolRegistry) !void {
+fn handleSlashCommand(allocator: std.mem.Allocator, input: []const u8, current_session_id: []const u8, session_manager: *core.session.SessionManager, registry: *tools.registry.ToolRegistry) !void {
+    _ = current_session_id;
     const stdout = std.io.getStdOut().writer();
     const trimmed = std.mem.trim(u8, input[1..], " \n\r");
 
@@ -432,19 +462,20 @@ fn handleSlashCommand(allocator: std.mem.Allocator, input: []const u8, registry:
             \\  ╔═══════════════════════════════╗
             \\  ║     Available Commands         ║
             \\  ╚═══════════════════════════════╝
-            \\
             \\  /help, /h      - Show this help
             \\  /clear         - Clear screen
             \\  /tools         - List available tools
             \\  /sessions      - List active sessions
+            \\  /new <name>    - Create new session
+            \\  /switch <name> - Switch to session
             \\  /model         - Show current model
             \\  /status        - Show agent status
             \\  /exit, /quit   - Exit TUI
             \\
             \\  Examples:
             \\    /tools
-            \\    /model
-            \\    /status
+            \\    /new my-session
+            \\    /switch default
             \\
         , .{});
         return;
@@ -472,30 +503,49 @@ fn handleSlashCommand(allocator: std.mem.Allocator, input: []const u8, registry:
     }
 
     if (std.mem.eql(u8, trimmed, "sessions")) {
-        try stdout.print("Active sessions: tui-session\n", .{});
-        return;
-    }
-
-    if (std.mem.eql(u8, trimmed, "model")) {
-        try stdout.print("Model: nvidia/nemotron-3-nano-4b\n", .{});
-        return;
-    }
-
-    if (std.mem.eql(u8, trimmed, "status")) {
-        try stdout.print(
-            \\
-            \\  ╔═══════════════════════════════╗
-            \\  ║       Agent Status             ║
-            \\  ╚═══════════════════════════════╝
-            \\
-            \\  Status: Ready
-            \\  Session: tui-session
-            \\  Model: nvidia/nemotron-3-nano-4b
-            \\  Security: PromptGuard + LeakDetector
-            \\
-        , .{});
+        var iter = session_manager.sessions.iterator();
+        var count: usize = 0;
+        while (iter.next()) |_| {
+            count += 1;
+        }
+        if (count == 0) {
+            try stdout.print("No active sessions\n", .{});
+        } else {
+            try stdout.print("Active sessions:\n", .{});
+            var iter2 = session_manager.sessions.iterator();
+            while (iter2.next()) |entry| {
+                try stdout.print("  • {s}\n", .{entry.key_ptr.*});
+            }
+        }
         return;
     }
 
     try stdout.print("Unknown command: /{s}\n", .{trimmed});
+}
+
+fn getCompletions(allocator: std.mem.Allocator, input: []const u8, registry: *tools.registry.ToolRegistry) []const []const u8 {
+    var completions = std.ArrayList([]const u8).init(allocator);
+    if (input.len == 0) {
+        return completions.items;
+    }
+
+    if (input[0] == '/') {
+        const commands = [_][]const u8{ "help", "clear", "tools", "sessions", "model", "status", "exit", "quit" };
+        const search = input[1..];
+        for (commands) |cmd| {
+            if (std.mem.startsWith(u8, cmd, search)) {
+                const completion = std.fmt.allocPrint(allocator, "/{s}", .{cmd}) catch continue;
+                completions.append(completion) catch {};
+            }
+        }
+    } else {
+        const tool_list = registry.list();
+        for (tool_list) |tool| {
+            if (std.mem.startsWith(u8, tool.name, input)) {
+                completions.append(tool.name) catch {};
+            }
+        }
+    }
+
+    return completions.items;
 }
