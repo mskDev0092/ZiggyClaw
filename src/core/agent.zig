@@ -3,6 +3,7 @@ const types = @import("types.zig");
 const tools = @import("tools");
 const session_mod = @import("session.zig");
 const core_llm = @import("llm.zig");
+const guard = @import("security").guard;
 
 const DEFAULT_SYSTEM_PROMPT = "You are an autonomous agent. When user asks to do something (read file, list files, run commands, search, etc), use the available tools to complete the task. Think step by step. Keep using tools until the task is complete. Always respond with actual content, not empty.";
 
@@ -32,8 +33,25 @@ pub const Agent = struct {
     /// 3. If tool calls present, execute and loop
     /// 4. Return final response when LLM stops requesting tools
     pub fn think(self: *Agent, session_id: []const u8, user_message: []const u8) ![]const u8 {
+        const check = guard.PromptGuard.check(user_message);
+        if (check.blocked) {
+            return try self.allocator.dupe(u8, check.reason orelse "Message blocked by security check");
+        }
+
+        const leak = guard.LeakDetector.check(user_message);
+        if (leak.blocked) {
+            return try self.allocator.dupe(u8, leak.reason orelse "Message blocked by leak detection");
+        }
+
         const sess = try self.session_manager.getOrCreate(session_id);
         try sess.addMessage("user", user_message);
+
+        const limit = self.config.context_window_limit;
+        const threshold = self.config.compact_threshold_percent;
+        if (sess.needsCompaction(limit, threshold)) {
+            try sess.compact(self.allocator);
+            std.debug.print("[Agent] Context compacted\n", .{});
+        }
 
         const max_iterations = self.config.max_iterations;
         var iteration: usize = 0;

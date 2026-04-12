@@ -67,6 +67,11 @@ pub fn run(allocator: std.mem.Allocator) !void {
         return;
     }
 
+    if (std.mem.eql(u8, subcommand, "tui")) {
+        try runTUI(allocator);
+        return;
+    }
+
     // Unknown
     try std.io.getStdOut().writer().print("Unknown command: {s}\n\n", .{subcommand});
     printHelp();
@@ -331,4 +336,166 @@ fn runPair(allocator: std.mem.Allocator) !void {
 
         try stdout.print("Agent> {s}\n\n", .{response});
     }
+}
+
+const TUICommand = struct {
+    name: []const u8,
+    description: []const u8,
+    handler: fn (allocator: std.mem.Allocator, args: []const u8) anyerror!void,
+};
+
+fn runTUI(allocator: std.mem.Allocator) !void {
+    const stdout = std.io.getStdOut().writer();
+    const stdin = std.io.getStdIn();
+
+    try stdout.print(
+        \\
+        \\  ╔══════════════════════════════════════════╗
+        \\  ║      🦞 ZiggyClaw TUI Mode ⚡            ║
+        \\  ╚══════════════════════════════════════════╝
+        \\
+        \\  Type /help for available commands
+        \\  Press Ctrl+C or /exit to quit
+        \\
+        \\  ───────────────────────────────────────────
+        \\
+    , .{});
+
+    var session_manager = core.session.SessionManager.init(allocator);
+    defer session_manager.deinit();
+
+    var registry = tools.registry.ToolRegistry.init(allocator);
+    defer registry.deinit();
+
+    try registry.register(tools.shell.getTool());
+    try registry.register(tools.file_read.getTool());
+    try registry.register(tools.write_file.getTool());
+    try registry.register(tools.edit_file.getTool());
+    try registry.register(tools.list_directory.getTool());
+    try registry.register(tools.search_files.getTool());
+    try registry.register(tools.find_files.getTool());
+    try registry.register(tools.web_get.getTool());
+    try registry.register(tools.web_fetch.getTool());
+    try registry.register(tools.search.getTool());
+    try registry.register(tools.execute_command.getTool());
+    try registry.register(tools.process.getTool());
+    try registry.register(tools.sessions.getTool());
+    tools.sessions.setGlobalManager(&session_manager, allocator);
+    try registry.register(tools.secrets.getTool());
+    tools.secrets.initSecrets(allocator);
+    try registry.register(tools.memory.getTool());
+    var mem = memory_mod.Memory.init(allocator);
+    tools.memory.setGlobalMemory(&mem, allocator);
+
+    const config = core.types.AgentConfig{ .model = "nvidia/nemotron-3-nano-4b" };
+    var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
+
+    try stdout.print("Session: default\n\n", .{});
+
+    var buffer: [8192]u8 = undefined;
+    while (true) {
+        try stdout.print("🦞> ", .{});
+
+        const bytes_read = stdin.read(&buffer) catch {
+            try stdout.print("\nGoodbye!\n", .{});
+            break;
+        };
+
+        if (bytes_read == 0) break;
+
+        const input = std.mem.trim(u8, buffer[0..bytes_read], "\n\r");
+
+        if (input.len == 0) continue;
+
+        if (input[0] == '/') {
+            try handleSlashCommand(allocator, input, &registry);
+            continue;
+        }
+
+        const response = agent.think("tui-session", input) catch {
+            try stdout.print("Error: Failed to get response\n\n", .{});
+            continue;
+        };
+        defer allocator.free(response);
+
+        try stdout.print("{s}\n\n", .{response});
+    }
+}
+
+fn handleSlashCommand(allocator: std.mem.Allocator, input: []const u8, registry: *tools.registry.ToolRegistry) !void {
+    const stdout = std.io.getStdOut().writer();
+    const trimmed = std.mem.trim(u8, input[1..], " \n\r");
+
+    if (std.mem.eql(u8, trimmed, "help") or std.mem.eql(u8, trimmed, "h")) {
+        try stdout.print(
+            \\
+            \\  ╔═══════════════════════════════╗
+            \\  ║     Available Commands         ║
+            \\  ╚═══════════════════════════════╝
+            \\
+            \\  /help, /h      - Show this help
+            \\  /clear         - Clear screen
+            \\  /tools         - List available tools
+            \\  /sessions      - List active sessions
+            \\  /model         - Show current model
+            \\  /status        - Show agent status
+            \\  /exit, /quit   - Exit TUI
+            \\
+            \\  Examples:
+            \\    /tools
+            \\    /model
+            \\    /status
+            \\
+        , .{});
+        return;
+    }
+
+    if (std.mem.eql(u8, trimmed, "exit") or std.mem.eql(u8, trimmed, "quit")) {
+        try stdout.print("Goodbye!\n", .{});
+        std.process.exit(0);
+        return;
+    }
+
+    if (std.mem.eql(u8, trimmed, "clear")) {
+        try stdout.print("\x1b[2J\x1b[H", .{});
+        return;
+    }
+
+    if (std.mem.eql(u8, trimmed, "tools")) {
+        const tool_list = registry.list();
+        defer allocator.free(tool_list);
+        try stdout.print("Available tools:\n", .{});
+        for (tool_list) |tool| {
+            try stdout.print("  • {s}\n", .{tool.name});
+        }
+        return;
+    }
+
+    if (std.mem.eql(u8, trimmed, "sessions")) {
+        try stdout.print("Active sessions: tui-session\n", .{});
+        return;
+    }
+
+    if (std.mem.eql(u8, trimmed, "model")) {
+        try stdout.print("Model: nvidia/nemotron-3-nano-4b\n", .{});
+        return;
+    }
+
+    if (std.mem.eql(u8, trimmed, "status")) {
+        try stdout.print(
+            \\
+            \\  ╔═══════════════════════════════╗
+            \\  ║       Agent Status             ║
+            \\  ╚═══════════════════════════════╝
+            \\
+            \\  Status: Ready
+            \\  Session: tui-session
+            \\  Model: nvidia/nemotron-3-nano-4b
+            \\  Security: PromptGuard + LeakDetector
+            \\
+        , .{});
+        return;
+    }
+
+    try stdout.print("Unknown command: /{s}\n", .{trimmed});
 }

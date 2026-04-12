@@ -39,7 +39,42 @@ pub const AgentConfig = struct {
     max_context_messages: usize = 50,
     max_tokens: ?usize = null,
     track_token_usage: bool = false,
+    context_window_limit: usize = 128000,
+    compact_threshold_percent: u8 = 75,
 };
+
+pub const ModelLimits = struct {
+    name: []const u8,
+    context_window: usize,
+    max_output_tokens: usize = 4096,
+};
+
+pub const model_limits: []const ModelLimits = &.{
+    .{ .name = "gpt-4o", .context_window = 128000, .max_output_tokens = 16384 },
+    .{ .name = "gpt-4-turbo", .context_window = 128000, .max_output_tokens = 4096 },
+    .{ .name = "gpt-3.5-turbo", .context_window = 16385, .max_output_tokens = 4096 },
+    .{ .name = "claude-3-opus", .context_window = 200000, .max_output_tokens = 4096 },
+    .{ .name = "claude-3-sonnet", .context_window = 200000, .max_output_tokens = 4096 },
+    .{ .name = "claude-3-haiku", .context_window = 200000, .max_output_tokens = 4096 },
+    .{ .name = "claude-3.5-sonnet", .context_window = 200000, .max_output_tokens = 8192 },
+    .{ .name = "llama-3", .context_window = 8192, .max_output_tokens = 4096 },
+    .{ .name = "llama-3.1", .context_window = 128000, .max_output_tokens = 4096 },
+    .{ .name = "mistral", .context_window = 8192, .max_output_tokens = 4096 },
+    .{ .name = "mixtral", .context_window = 32768, .max_output_tokens = 4096 },
+    .{ .name = "qwen2", .context_window = 32768, .max_output_tokens = 4096 },
+    .{ .name = "qwen2.5", .context_window = 32768, .max_output_tokens = 4096 },
+    .{ .name = "phi-3", .context_window = 4096, .max_output_tokens = 2048 },
+    .{ .name = "gemma-2", .context_window = 8192, .max_output_tokens = 8192 },
+};
+
+pub fn getModelLimit(model_name: []const u8) ?ModelLimits {
+    for (model_limits) |limit| {
+        if (std.mem.indexOf(u8, model_name, limit.name) != null) {
+            return limit;
+        }
+    }
+    return null;
+}
 
 pub const ReasoningStep = struct {
     thought: []const u8,
