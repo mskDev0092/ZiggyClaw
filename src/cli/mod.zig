@@ -250,7 +250,7 @@ fn runAgent(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     tools.memory.setGlobalMemory(&mem, allocator);
 
     const config = core.types.AgentConfig{
-        .model = "nvidia/nemotron-3-nano-4b",
+        .model = "llama3.2",
     };
 
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
@@ -305,7 +305,7 @@ fn runPair(allocator: std.mem.Allocator) !void {
     var mem = memory_mod.Memory.init(allocator);
     tools.memory.setGlobalMemory(&mem, allocator);
 
-    const config = core.types.AgentConfig{ .model = "nvidia/nemotron-3-nano-4b" };
+    const config = core.types.AgentConfig{ .model = "llama3.2" };
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
 
     var buffer: [4096]u8 = undefined;
@@ -387,7 +387,7 @@ fn runTUI(allocator: std.mem.Allocator) !void {
     var mem = memory_mod.Memory.init(allocator);
     tools.memory.setGlobalMemory(&mem, allocator);
 
-    const config = core.types.AgentConfig{ .model = "nvidia/nemotron-3-nano-4b" };
+    const config = core.types.AgentConfig{ .model = "llama3.2" };
     var agent = core.agent.Agent.init(allocator, config, &session_manager, &registry);
 
     const current_session_id: []const u8 = "default";

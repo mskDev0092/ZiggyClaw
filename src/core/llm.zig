@@ -287,22 +287,30 @@ pub const LLMClient = struct {
 
         // Parse content from message object within choices
         // Find choices array and parse the first message's content
+        // Look for "content" that appears BEFORE "reasoning_content" to avoid confusion
         if (std.mem.indexOf(u8, response, "\"choices\":")) |choices_start| {
             const after_choices = response[choices_start + 9 ..];
             if (std.mem.indexOf(u8, after_choices, "\"message\":{")) |msg_start| {
                 const after_msg = after_choices[msg_start + 9 ..];
+
+                // Find position of reasoning_content first to know where content ends
+                const reasoning_pos = std.mem.indexOf(u8, after_msg, "\"reasoning_content\":");
+                const search_end = reasoning_pos orelse after_msg.len;
+                const content_search_area = after_msg[0..search_end];
+
                 const content_pat = "\"content\":";
-                if (std.mem.indexOf(u8, after_msg, content_pat)) |pos| {
+                if (std.mem.indexOf(u8, content_search_area, content_pat)) |pos| {
                     const content_start = pos + content_pat.len;
                     var cursor = content_start;
-                    while (cursor < after_msg.len and (after_msg[cursor] == ' ' or after_msg[cursor] == '\t')) cursor += 1;
-                    if (cursor < after_msg.len and after_msg[cursor] == '"') cursor += 1;
+                    while (cursor < content_search_area.len and (content_search_area[cursor] == ' ' or content_search_area[cursor] == '\t')) cursor += 1;
+                    if (cursor < content_search_area.len and content_search_area[cursor] == '"') cursor += 1;
                     const value_start = cursor;
                     var value_end = cursor;
-                    while (value_end < after_msg.len and after_msg[value_end] != '"') value_end += 1;
-                    if (value_end < after_msg.len) {
-                        const parsed = after_msg[value_start..value_end];
-                        if (parsed.len > 0 and std.mem.trim(u8, parsed, " \n\r\t").len > 0) {
+                    while (value_end < content_search_area.len and content_search_area[value_end] != '"') value_end += 1;
+                    if (value_end < content_search_area.len) {
+                        const parsed = content_search_area[value_start..value_end];
+                        // Keep the content even if it seems empty - it might have newlines
+                        if (parsed.len > 0) {
                             self.allocator.free(content);
                             content = try self.allocator.dupe(u8, parsed);
                         }

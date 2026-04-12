@@ -5,7 +5,7 @@ const session_mod = @import("session.zig");
 const core_llm = @import("llm.zig");
 const guard = @import("security").guard;
 
-const DEFAULT_SYSTEM_PROMPT = "You are an autonomous agent. When user asks to do something (read file, list files, run commands, search, etc), use the available tools to complete the task. Think step by step. Keep using tools until the task is complete. Always respond with actual content, not empty.";
+const DEFAULT_SYSTEM_PROMPT = "You are a helpful AI assistant. Respond conversationally to greetings and general questions. Only use tools when the user asks you to perform a specific task like reading files, running commands, searching, or fetching web content. Be friendly and concise.";
 
 pub const Agent = struct {
     config: types.AgentConfig,
@@ -92,7 +92,7 @@ pub const Agent = struct {
             defer self.allocator.free(tool_defs);
 
             const llm_response = try llm.callLLM(sess.messages, tool_defs);
-            std.debug.print("[Agent] Response - content: '{s}', reasoning: '{s}', tool_calls: {d}, stop_reason: '{s}'\n", .{ llm_response.content, llm_response.reasoning_content orelse "", llm_response.tool_calls.items.len, llm_response.stop_reason });
+            std.debug.print("[Agent] Response - content: '{s}', tool_calls: {d}, stop_reason: '{s}'\n", .{ llm_response.content, llm_response.tool_calls.items.len, llm_response.stop_reason });
             defer {
                 self.allocator.free(llm_response.content);
                 self.allocator.free(llm_response.stop_reason);
@@ -104,18 +104,17 @@ pub const Agent = struct {
                 try sess.addMessage("assistant", llm_response.content);
             }
 
-            // If no tool calls, check for meaningful content - otherwise continue looping
+            // If no tool calls, prefer actual content; do not surface reasoning_content
+            // If content empty, keep looping
             const is_empty = std.mem.trim(u8, llm_response.content, " \n\r\t").len == 0;
-            const has_reasoning = llm_response.reasoning_content != null and std.mem.trim(u8, llm_response.reasoning_content.?, " \n\r\t").len > 0;
 
             if (llm_response.tool_calls.items.len == 0) {
                 if (!is_empty) {
                     return try self.allocator.dupe(u8, llm_response.content);
-                } else if (has_reasoning) {
-                    return try self.allocator.dupe(u8, llm_response.reasoning_content.?);
                 } else {
-                    // Empty response - continue looping to get meaningful result
-                    continue;
+                    // No content; provide a safe fallback to avoid dead-end in pair mode
+                    const fallback = try self.allocator.dupe(u8, "Hello! How can I help you today?");
+                    return fallback;
                 }
             }
 
